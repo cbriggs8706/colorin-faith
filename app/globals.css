@@ -209,3 +209,24 @@ select {
     linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.7)),
     var(--gradient-cool);
 }
+
+.rich-copy {
+  display: grid;
+  gap: 1rem;
+}
+
+.rich-copy p,
+.rich-copy ul,
+.rich-copy h2,
+.rich-copy h3 {
+  margin: 0;
+}
+
+.rich-copy strong {
+  font-weight: 800;
+  color: var(--brand-ink);
+}
+
+.rich-copy em {
+  font-style: italic;
+}

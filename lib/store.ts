@@ -4,8 +4,11 @@ import {
   hasSupabaseDatabaseEnv,
 } from "@/lib/supabase/env";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import { getDefaultProductGradient } from "@/lib/product-assets";
 import type {
   Product,
+  ProductDownload,
+  ProductImage,
   ProductInput,
   ProductRecord,
   SiteContent,
@@ -19,6 +22,17 @@ const productsPath = path.join(dataDirectory, "products.json");
 const subscribersPath = path.join(dataDirectory, "subscribers.json");
 const siteContentPath = path.join(dataDirectory, "site-content.json");
 const siteContentKey = "homepage";
+
+function mapSupabaseProductError(action: "save" | "update" | "delete", message: string) {
+  if (
+    message.includes("Could not find the 'downloads' column") ||
+    message.includes("Could not find the 'images' column")
+  ) {
+    return `Unable to ${action} Supabase product: your Supabase products table is missing the new asset columns. Run the SQL in supabase/schema.sql (or the migration in supabase/migrations) and refresh the schema cache.`;
+  }
+
+  return `Unable to ${action} Supabase product: ${message}`;
+}
 
 async function ensureDataFiles() {
   await fs.mkdir(dataDirectory, { recursive: true });
@@ -64,14 +78,33 @@ function normalizeProduct(input: ProductInput): Product {
     stripePriceId: input.stripePriceId.trim(),
     category: input.category.trim(),
     tagline: input.tagline.trim(),
-    emoji: input.emoji.trim() || "🎨",
-    gradient: input.gradient.trim(),
+    gradient: input.gradient.trim() || getDefaultProductGradient(),
     price: Number(input.price),
     pageCount: Number(input.pageCount),
     audience: input.audience.map((entry) => entry.trim()).filter(Boolean),
     features: input.features.map((entry) => entry.trim()).filter(Boolean),
     featured: Boolean(input.featured),
+    images: normalizeImages(input.images),
+    downloads: normalizeDownloads(input.downloads),
   };
+}
+
+function normalizeImages(images: ProductImage[]) {
+  return images
+    .map((image) => ({
+      path: image.path.trim(),
+      alt: image.alt.trim(),
+    }))
+    .filter((image) => image.path);
+}
+
+function normalizeDownloads(downloads: ProductDownload[]) {
+  return downloads
+    .map((download) => ({
+      path: download.path.trim(),
+      label: download.label.trim(),
+    }))
+    .filter((download) => download.path && download.label);
 }
 
 function productFromRecord(record: ProductRecord): Product {
@@ -84,11 +117,12 @@ function productFromRecord(record: ProductRecord): Product {
     category: record.category,
     pageCount: Number(record.page_count),
     tagline: record.tagline,
-    emoji: record.emoji,
     gradient: record.gradient,
     audience: record.audience ?? [],
     features: record.features ?? [],
     featured: Boolean(record.featured),
+    images: record.images ?? [],
+    downloads: record.downloads ?? [],
   };
 }
 
@@ -102,11 +136,12 @@ function productToRecord(product: Product): ProductRecord {
     category: product.category,
     page_count: product.pageCount,
     tagline: product.tagline,
-    emoji: product.emoji,
     gradient: product.gradient,
     audience: product.audience,
     features: product.features,
     featured: product.featured,
+    images: product.images,
+    downloads: product.downloads,
   };
 }
 
@@ -164,7 +199,7 @@ export async function createProduct(input: ProductInput) {
       .single();
 
     if (error) {
-      throw new Error(`Unable to save Supabase product: ${error.message}`);
+      throw new Error(mapSupabaseProductError("save", error.message));
     }
 
     return productFromRecord(data as ProductRecord);
@@ -194,7 +229,7 @@ export async function updateProduct(slug: string, input: ProductInput) {
       .single();
 
     if (error) {
-      throw new Error(`Unable to update Supabase product: ${error.message}`);
+      throw new Error(mapSupabaseProductError("update", error.message));
     }
 
     return productFromRecord(data as ProductRecord);
@@ -222,7 +257,7 @@ export async function deleteProduct(slug: string) {
     const { error } = await supabase.from("products").delete().eq("slug", slug);
 
     if (error) {
-      throw new Error(`Unable to delete Supabase product: ${error.message}`);
+      throw new Error(mapSupabaseProductError("delete", error.message));
     }
 
     return;
@@ -236,6 +271,35 @@ export async function deleteProduct(slug: string) {
   }
 
   await writeJsonFile(productsPath, nextProducts);
+}
+
+export async function updateProductImages(slug: string, images: ProductImage[]) {
+  const product = await getProductBySlug(slug);
+
+  if (!product) {
+    throw new Error("Product not found.");
+  }
+
+  return updateProduct(slug, {
+    ...product,
+    images,
+  });
+}
+
+export async function updateProductDownloads(
+  slug: string,
+  downloads: ProductDownload[],
+) {
+  const product = await getProductBySlug(slug);
+
+  if (!product) {
+    throw new Error("Product not found.");
+  }
+
+  return updateProduct(slug, {
+    ...product,
+    downloads,
+  });
 }
 
 export async function getSubscribers() {

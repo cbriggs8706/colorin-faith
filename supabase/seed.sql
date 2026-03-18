@@ -7,11 +7,12 @@ insert into public.products (
   category,
   page_count,
   tagline,
-  emoji,
   gradient,
   audience,
   features,
-  featured
+  featured,
+  images,
+  downloads
 )
 values
   (
@@ -23,11 +24,12 @@ values
     'Bible Study',
     12,
     'Faith meets fun',
-    '🍓',
     'linear-gradient(135deg, #ffb400, #ff7a00 18%, #ef4058 46%, #1f98ee 74%, #2743b6)',
     '{"Homeschool families","Sunday school","Quiet time baskets"}',
     '{"12 printable coloring pages","Scripture memory prompts","Kid-friendly bold outlines"}',
-    true
+    true,
+    '[]'::jsonb,
+    '[]'::jsonb
   ),
   (
     'noahs-ark-adventure-set',
@@ -38,11 +40,12 @@ values
     'Bible Story',
     10,
     'Animals, rainbows, and wonder',
-    '🌈',
     'linear-gradient(135deg, #1f98ee, #1150b5 34%, #2743b6 54%, #ffb400 82%, #ff7a00)',
     '{"Preschool ministry","Church busy bags","Family activity time"}',
     '{"10 themed printable pages","Story recap moments","Designed for easy home printing"}',
-    true
+    true,
+    '[]'::jsonb,
+    '[]'::jsonb
   ),
   (
     'easter-joy-coloring-bundle',
@@ -53,11 +56,12 @@ values
     'Seasonal',
     16,
     'Celebration with purpose',
-    '🌷',
     'linear-gradient(135deg, #e533b6, #4f1b84 26%, #2743b6 54%, #1f98ee 74%, #ef4058)',
     '{"Easter services","Christian classrooms","Family gatherings"}',
     '{"16 festive printable pages","Mix of simple and detailed designs","Great for holiday tables"}',
-    true
+    true,
+    '[]'::jsonb,
+    '[]'::jsonb
   )
 on conflict (slug) do update set
   name = excluded.name,
@@ -67,11 +71,12 @@ on conflict (slug) do update set
   category = excluded.category,
   page_count = excluded.page_count,
   tagline = excluded.tagline,
-  emoji = excluded.emoji,
   gradient = excluded.gradient,
   audience = excluded.audience,
   features = excluded.features,
-  featured = excluded.featured;
+  featured = excluded.featured,
+  images = excluded.images,
+  downloads = excluded.downloads;
 
 insert into public.site_content (key, value)
 values (
@@ -79,7 +84,7 @@ values (
   $${
     "heroHighlight": {
       "title": "Fruit of the Spirit Coloring Pack",
-      "description": "A bestselling starter set with joyful fruit characters, simple Scripture tie-ins, and printable pages that work beautifully for home or classroom use.",
+      "description": "A bestselling set with joyful fruit characters, simple Scripture tie-ins, and printable pages that work beautifully for home or classroom use.",
       "pages": 12,
       "price": "$7"
     },
@@ -120,25 +125,25 @@ values (
       },
       {
         "title": "Deliver and print",
-        "description": "Connect your final file-delivery workflow so customers can access and print their pages right away."
+        "description": "Customers complete checkout and land on a secure page where they can download the files attached to their product."
       }
     ],
     "faqs": [
       {
         "question": "Are these physical products?",
-        "answer": "No. This starter storefront is set up for digital downloads only, which keeps fulfillment simple and instant."
+        "answer": "No. Every item in the shop is a digital download, so you can check out and start printing right away."
       },
       {
         "question": "How do customers receive their files?",
-        "answer": "The site includes Stripe checkout and success pages now. For launch, connect checkout completion to a secure file delivery method such as emailed links, a download page, or a digital delivery service."
+        "answer": "After payment, customers are returned to a secure order-success page where the files attached to that product are available to download."
       },
       {
         "question": "Can I update products without editing code?",
-        "answer": "Locally, yes. The admin page saves product updates into JSON files. For production, the next step is moving this admin flow to a persistent database or external CMS."
+        "answer": "Yes. Admin can update product details, images, downloads, and featured settings from the dashboard."
       },
       {
-        "question": "Can I collect emails before launch?",
-        "answer": "Yes. The newsletter form stores subscribers in a lightweight local file right now so you can validate the flow before connecting your email platform."
+        "question": "Can I collect subscriber emails?",
+        "answer": "Yes. Visitors can join your email list from the homepage and product pages to hear about new releases, promotions, and freebies."
       }
     ]
   }$$::jsonb

@@ -74,12 +74,12 @@ export default async function Home() {
             </div>
             <div className="gradient-soft rounded-[2rem] border border-white/80 px-5 py-5 shadow-[0_18px_45px_rgba(32,48,66,0.14)]">
               <p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--brand-coral)]">
-                Built for easy sales
+                Shop-ready experience
               </p>
               <ul className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
                 <li>Stripe checkout ready for one-time digital purchases</li>
-                <li>File-backed admin dashboard for products and content</li>
-                <li>Email capture section ready for launch freebies and promos</li>
+                <li>Customer downloads delivered from attached product files</li>
+                <li>Image galleries and product management handled in one admin dashboard</li>
               </ul>
             </div>
           </div>
@@ -161,7 +161,7 @@ export default async function Home() {
           <div className="mt-6">
             <NewsletterForm
               heading="Get launch emails and a printable freebie."
-              subheading="Subscribers are saved in a lightweight local store for now, so you can connect your email platform next."
+              subheading="Join the list for new printable releases, special offers, and cheerful faith-filled freebies."
             />
           </div>
         </div>

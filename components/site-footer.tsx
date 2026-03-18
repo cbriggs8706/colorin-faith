@@ -9,7 +9,7 @@ export function SiteFooter() {
             Color in Faith Printables
           </p>
           <p className="mt-1">
-            Planned domain:{" "}
+            Visit us at{" "}
             <span className="font-bold text-slate-700">
               colorinfaithprintables.com
             </span>

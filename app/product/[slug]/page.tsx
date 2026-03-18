@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BuyButton } from "@/components/buy-button";
 import { NewsletterForm } from "@/components/newsletter-form";
+import { ProductDescription } from "@/components/product-description";
+import { ProductImageGallery } from "@/components/product-image-gallery";
+import { getProductImageUrl } from "@/lib/product-assets";
 import { getProductBySlug, getProducts } from "@/lib/store";
 
 type ProductPageProps = {
@@ -43,28 +46,36 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
+  const galleryImages = product.images.map((image) => ({
+    src: getProductImageUrl(image.path),
+    alt: image.alt || product.name,
+  }));
+
   return (
     <div className="flex flex-col gap-8 py-6 sm:py-8">
       <section className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
-        <div
-          className="relative min-h-[380px] overflow-hidden rounded-[2rem] p-6 sm:p-8"
-          style={{ background: product.gradient }}
-        >
-          <div className="absolute left-5 top-5 rounded-full bg-white/75 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--brand-ink)]">
-            {product.category}
+        <div className="card-surface overflow-hidden rounded-[2rem] p-4 sm:p-5">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3 px-2 pt-2">
+            <div>
+              <div className="rounded-full bg-white/80 px-3 py-2 text-xs font-black uppercase tracking-[0.18em] text-[var(--brand-ink)]">
+                {product.category}
+              </div>
+              <p className="mt-4 text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-coral)]">
+                {product.tagline}
+              </p>
+              <h1 className="section-title mt-2 text-3xl font-extrabold text-[var(--brand-ink)] sm:text-4xl">
+                {product.name}
+              </h1>
+            </div>
           </div>
-          <div className="absolute right-6 top-8 text-6xl sm:text-7xl">{product.emoji}</div>
-          <div className="absolute bottom-6 left-6 right-6 rounded-[1.7rem] bg-white/78 p-5 backdrop-blur-md">
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-coral)]">
-              {product.tagline}
-            </p>
-            <h1 className="section-title mt-2 text-3xl font-extrabold text-[var(--brand-ink)] sm:text-4xl">
-              {product.name}
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-slate-700 sm:text-base">
-              {product.description}
-            </p>
-          </div>
+          {galleryImages.length > 0 ? (
+            <ProductImageGallery images={galleryImages} />
+          ) : (
+            <div
+              className="min-h-[380px] rounded-[2rem]"
+              style={{ background: product.gradient }}
+            />
+          )}
         </div>
 
         <div className="card-surface rounded-[2rem] px-5 py-6 sm:px-7">
@@ -101,6 +112,15 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </div>
       </section>
 
+      <section className="card-surface rounded-[2rem] px-5 py-6 sm:px-7">
+        <div className="max-w-4xl">
+          <p className="pill-label w-fit text-[var(--brand-berry)]">About this printable</p>
+          <div className="mt-5 rounded-[1.5rem] bg-white/70 px-5 py-5 sm:px-6">
+            <ProductDescription description={product.description} />
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
         <div className="card-surface rounded-[2rem] px-5 py-6 sm:px-7">
           <p className="pill-label w-fit text-[var(--brand-ink)]">Perfect for</p>
@@ -120,9 +140,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 After purchase
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-700">
-                Stripe sends the customer through checkout now, and this starter
-                includes success and cancel pages. Connect your delivery workflow
-                next by pairing checkout completion with secure file delivery.
+                Customers are sent through secure Stripe checkout, then returned
+                to a download page with access to the files attached to this product.
               </p>
             </div>
             <Link className="secondary-button" href="/shop">

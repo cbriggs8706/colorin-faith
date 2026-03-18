@@ -1,6 +1,12 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
+import {
+  PRODUCT_GRADIENTS,
+  getDefaultProductGradient,
+  getProductImageUrl,
+} from "@/lib/product-assets";
 import type { Product, ProductInput } from "@/lib/types";
 
 const emptyForm: ProductInput = {
@@ -12,11 +18,12 @@ const emptyForm: ProductInput = {
   category: "",
   pageCount: 1,
   tagline: "",
-  emoji: "🎨",
-  gradient: "linear-gradient(135deg, #ffb400, #e533b6 34%, #1f98ee 68%, #5020a4)",
+  gradient: getDefaultProductGradient(),
   audience: [],
   features: [],
   featured: false,
+  images: [],
+  downloads: [],
 };
 
 function toTextList(value: string) {
@@ -36,11 +43,12 @@ function fromProduct(product: Product): ProductInput {
     category: product.category,
     pageCount: product.pageCount,
     tagline: product.tagline,
-    emoji: product.emoji,
     gradient: product.gradient,
     audience: product.audience,
     features: product.features,
     featured: product.featured,
+    images: product.images,
+    downloads: product.downloads,
   };
 }
 
@@ -60,9 +68,13 @@ export function AdminProductManager({
   const [featuresText, setFeaturesText] = useState(
     initialProducts[0]?.features.join(", ") ?? "",
   );
+  const [imageAlt, setImageAlt] = useState("");
+  const [downloadLabel, setDownloadLabel] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isUploadingDownload, setIsUploadingDownload] = useState(false);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.slug === selectedSlug),
@@ -74,6 +86,36 @@ export function AdminProductManager({
     setForm(fromProduct(product));
     setAudienceText(product.audience.join(", "));
     setFeaturesText(product.features.join(", "));
+    setImageAlt("");
+    setDownloadLabel("");
+    setStatus("");
+    setError("");
+  }
+
+  function syncProduct(saved: Product, previousSlug = selectedSlug) {
+    setProducts((current) => {
+      const next = [
+        ...current.filter((product) => product.slug !== previousSlug),
+        saved,
+      ].sort((left, right) => left.name.localeCompare(right.name));
+
+      return next;
+    });
+    loadProduct(saved);
+  }
+
+  function resetEditor(product?: Product) {
+    if (product) {
+      loadProduct(product);
+      return;
+    }
+
+    setSelectedSlug("");
+    setForm(emptyForm);
+    setAudienceText("");
+    setFeaturesText("");
+    setImageAlt("");
+    setDownloadLabel("");
     setStatus("");
     setError("");
   }
@@ -87,6 +129,8 @@ export function AdminProductManager({
       ...form,
       audience: toTextList(audienceText),
       features: toTextList(featuresText),
+      images: selectedProduct?.images ?? form.images,
+      downloads: selectedProduct?.downloads ?? form.downloads,
     };
 
     try {
@@ -110,14 +154,8 @@ export function AdminProductManager({
         throw new Error(saved.error ?? "Unable to save product.");
       }
 
-      setProducts((current) => {
-        const others = current.filter((product) => product.slug !== selectedSlug);
-        return [...others, saved].sort((left, right) =>
-          left.name.localeCompare(right.name),
-        );
-      });
-      loadProduct(saved);
-      setStatus("Product saved to data/products.json.");
+      syncProduct(saved, selectedSlug);
+      setStatus("Product saved.");
     } catch (saveError) {
       setError(
         saveError instanceof Error ? saveError.message : "Unable to save product.",
@@ -151,15 +189,12 @@ export function AdminProductManager({
         (product) => product.slug !== selectedProduct.slug,
       );
       setProducts(nextProducts);
-      setSelectedSlug(nextProducts[0]?.slug ?? "");
       if (nextProducts[0]) {
         loadProduct(nextProducts[0]);
       } else {
-        setForm(emptyForm);
-        setAudienceText("");
-        setFeaturesText("");
+        resetEditor();
       }
-      setStatus("Product removed from local JSON.");
+      setStatus("Product deleted.");
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
@@ -168,6 +203,146 @@ export function AdminProductManager({
       );
     } finally {
       setIsPending(false);
+    }
+  }
+
+  async function uploadAsset(
+    assetType: "image" | "download",
+    file: File,
+    metadataValue: string,
+    options?: {
+      managePendingState?: boolean;
+    },
+  ) {
+    const slug = form.slug.trim();
+
+    if (!slug || !selectedProduct) {
+      setError("Save the product before uploading images or downloads.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("type", assetType);
+    formData.append("file", file);
+
+    const managePendingState = options?.managePendingState ?? true;
+
+    if (assetType === "image" && managePendingState) {
+      formData.append("alt", metadataValue);
+      setIsUploadingImage(true);
+    } else if (assetType === "image") {
+      formData.append("alt", metadataValue);
+    } else if (managePendingState) {
+      formData.append("label", metadataValue);
+      setIsUploadingDownload(true);
+    } else {
+      formData.append("label", metadataValue);
+    }
+
+    setStatus("");
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/products/${slug}/assets`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const payload = (await response.json()) as Product & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to upload asset.");
+      }
+
+      syncProduct(payload, payload.slug);
+      setStatus(
+        assetType === "image" ? "Product image uploaded." : "Download uploaded.",
+      );
+      if (assetType === "image") {
+        setImageAlt("");
+      } else {
+        setDownloadLabel("");
+      }
+    } catch (uploadError) {
+      setError(
+        uploadError instanceof Error
+          ? uploadError.message
+          : "Unable to upload asset.",
+      );
+    } finally {
+      if (managePendingState) {
+        setIsUploadingImage(false);
+        setIsUploadingDownload(false);
+      }
+    }
+  }
+
+  async function uploadImageBatch(fileList: FileList) {
+    const files = Array.from(fileList);
+
+    if (files.length === 0) {
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setStatus("");
+    setError("");
+
+      try {
+      for (const file of files) {
+        await uploadAsset("image", file, imageAlt, {
+          managePendingState: false,
+        });
+      }
+
+      setStatus(
+        files.length === 1
+          ? "Product image uploaded."
+          : `${files.length} product images uploaded.`,
+      );
+      setImageAlt("");
+    } catch (batchError) {
+      setError(
+        batchError instanceof Error
+          ? batchError.message
+          : "Unable to upload product images.",
+      );
+    } finally {
+      setIsUploadingImage(false);
+    }
+  }
+
+  async function removeAsset(type: "image" | "download", path: string) {
+    if (!selectedProduct) {
+      return;
+    }
+
+    setStatus("");
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/products/${selectedProduct.slug}/assets`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ type, path }),
+      });
+
+      const payload = (await response.json()) as Product & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to delete asset.");
+      }
+
+      syncProduct(payload, payload.slug);
+      setStatus(type === "image" ? "Product image removed." : "Download removed.");
+    } catch (removeError) {
+      setError(
+        removeError instanceof Error
+          ? removeError.message
+          : "Unable to delete asset.",
+      );
     }
   }
 
@@ -185,14 +360,7 @@ export function AdminProductManager({
           </div>
           <button
             className="secondary-button"
-            onClick={() => {
-              setSelectedSlug("");
-              setForm(emptyForm);
-              setAudienceText("");
-              setFeaturesText("");
-              setStatus("");
-              setError("");
-            }}
+            onClick={() => resetEditor()}
             type="button"
           >
             New product
@@ -207,7 +375,7 @@ export function AdminProductManager({
                   ? "bg-[var(--surface-pop)]"
                   : "bg-white/70"
               }`}
-              onClick={() => loadProduct(product)}
+              onClick={() => resetEditor(product)}
               type="button"
             >
               <div className="flex items-center justify-between gap-3">
@@ -304,7 +472,7 @@ export function AdminProductManager({
               }
             />
           </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
+          <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
             Tagline
             <input
               className="field"
@@ -314,24 +482,28 @@ export function AdminProductManager({
               }
             />
           </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Emoji
-            <input
-              className="field"
-              value={form.emoji}
-              onChange={(event) => setForm({ ...form, emoji: event.target.value })}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
+          <div className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
             Gradient
-            <input
-              className="field"
-              value={form.gradient}
-              onChange={(event) =>
-                setForm({ ...form, gradient: event.target.value })
-              }
-            />
-          </label>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {PRODUCT_GRADIENTS.map((gradient) => {
+                const isSelected = form.gradient === gradient;
+
+                return (
+                  <button
+                    key={gradient}
+                    className={`h-20 rounded-[1.25rem] border-2 ${
+                      isSelected ? "border-[var(--brand-ink)]" : "border-white/80"
+                    }`}
+                    onClick={() => setForm({ ...form, gradient })}
+                    style={{ background: gradient }}
+                    type="button"
+                  >
+                    <span className="sr-only">Choose gradient swatch</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
             Description
             <textarea
@@ -378,6 +550,136 @@ export function AdminProductManager({
           </button>
           {status ? <p className="text-sm font-bold text-emerald-700">{status}</p> : null}
           {error ? <p className="text-sm font-bold text-red-600">{error}</p> : null}
+        </div>
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          <section className="rounded-[1.5rem] bg-white/70 px-4 py-4">
+            <h3 className="text-lg font-black text-[var(--brand-ink)]">Product images</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Upload one or more product images to display before purchase.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <input
+                className="field"
+                placeholder="Alt text for the next upload"
+                value={imageAlt}
+                onChange={(event) => setImageAlt(event.target.value)}
+              />
+              <input
+                className="field"
+                disabled={!selectedProduct || isUploadingImage}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(event) => {
+                  const files = event.target.files;
+
+                  if (files?.length) {
+                    void uploadImageBatch(files);
+                  }
+
+                  event.target.value = "";
+                }}
+              />
+            </div>
+            <div className="mt-4 space-y-3">
+              {form.images.length > 0 ? (
+                form.images.map((image) => (
+                  <div
+                    key={image.path}
+                    className="rounded-[1.2rem] border border-slate-200 bg-white p-3"
+                  >
+                    <Image
+                      alt={image.alt || form.name}
+                      className="h-32 w-full rounded-[1rem] object-cover"
+                      height={128}
+                      src={getProductImageUrl(image.path)}
+                      unoptimized
+                      width={320}
+                    />
+                    <div className="mt-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-[var(--brand-ink)]">
+                          {image.alt || form.name}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">{image.path}</p>
+                      </div>
+                      <button
+                        className="secondary-button"
+                        onClick={() => void removeAsset("image", image.path)}
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  Save the product, then upload images from your Supabase bucket.
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-[1.5rem] bg-white/70 px-4 py-4">
+            <h3 className="text-lg font-black text-[var(--brand-ink)]">Customer downloads</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Upload one or more digital files that paying customers can download.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <input
+                className="field"
+                placeholder="Download label for the next upload"
+                value={downloadLabel}
+                onChange={(event) => setDownloadLabel(event.target.value)}
+              />
+              <input
+                className="field"
+                disabled={!selectedProduct || isUploadingDownload}
+                type="file"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+
+                  if (file) {
+                    void uploadAsset("download", file, downloadLabel);
+                  }
+
+                  event.target.value = "";
+                }}
+              />
+            </div>
+            <div className="mt-4 space-y-3">
+              {form.downloads.length > 0 ? (
+                form.downloads.map((download) => (
+                  <div
+                    key={download.path}
+                    className="rounded-[1.2rem] border border-slate-200 bg-white p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-[var(--brand-ink)]">
+                          {download.label}
+                        </p>
+                        <p className="truncate text-xs text-slate-500">{download.path}</p>
+                      </div>
+                      <button
+                        className="secondary-button"
+                        onClick={() => void removeAsset("download", download.path)}
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">
+                  Upload PDFs, ZIPs, or other digital files after the product is saved.
+                </p>
+              )}
+            </div>
+          </section>
         </div>
       </div>
     </section>

@@ -7,14 +7,25 @@ export type Product = {
   category: string;
   pageCount: number;
   tagline: string;
-  emoji: string;
   gradient: string;
   audience: string[];
   features: string[];
   featured: boolean;
+  images: ProductImage[];
+  downloads: ProductDownload[];
 };
 
 export type ProductInput = Product;
+
+export type ProductImage = {
+  path: string;
+  alt: string;
+};
+
+export type ProductDownload = {
+  path: string;
+  label: string;
+};
 
 export type Subscriber = {
   email: string;
@@ -31,11 +42,12 @@ export type ProductRecord = {
   category: string;
   page_count: number;
   tagline: string;
-  emoji: string;
   gradient: string;
   audience: string[];
   features: string[];
   featured: boolean;
+  images: ProductImage[];
+  downloads: ProductDownload[];
 };
 
 export type SubscriberRecord = {
@@ -70,4 +82,11 @@ export type SiteContent = {
     question: string;
     answer: string;
   }>;
+};
+
+export type ContactSubmission = {
+  name: string;
+  email: string;
+  message: string;
+  createdAt: string;
 };

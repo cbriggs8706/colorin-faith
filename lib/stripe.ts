@@ -13,3 +13,8 @@ export function getStripe() {
 
   return stripeInstance;
 }
+
+export async function getCheckoutSession(sessionId: string) {
+  const stripe = getStripe();
+  return stripe.checkout.sessions.retrieve(sessionId);
+}

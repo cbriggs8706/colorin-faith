@@ -7,11 +7,12 @@ create table if not exists public.products (
   category text not null,
   page_count integer not null,
   tagline text not null,
-  emoji text not null default '🎨',
   gradient text not null,
   audience text[] not null default '{}',
   features text[] not null default '{}',
   featured boolean not null default false,
+  images jsonb not null default '[]'::jsonb,
+  downloads jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default timezone('utc', now())
 );
 

@@ -8,11 +8,12 @@
     "category": "Bible Study",
     "pageCount": 12,
     "tagline": "Faith meets fun",
-    "emoji": "🍓",
     "gradient": "linear-gradient(135deg, #ffb400, #ff7a00 18%, #ef4058 46%, #1f98ee 74%, #2743b6)",
     "audience": ["Homeschool families", "Sunday school", "Quiet time baskets"],
     "features": ["12 printable coloring pages", "Scripture memory prompts", "Kid-friendly bold outlines"],
-    "featured": true
+    "featured": true,
+    "images": [],
+    "downloads": []
   },
   {
     "name": "Noah's Ark Adventure Set",
@@ -23,11 +24,12 @@
     "category": "Bible Story",
     "pageCount": 10,
     "tagline": "Animals, rainbows, and wonder",
-    "emoji": "🌈",
     "gradient": "linear-gradient(135deg, #1f98ee, #1150b5 34%, #2743b6 54%, #ffb400 82%, #ff7a00)",
     "audience": ["Preschool ministry", "Church busy bags", "Family activity time"],
     "features": ["10 themed printable pages", "Story recap moments", "Designed for easy home printing"],
-    "featured": true
+    "featured": true,
+    "images": [],
+    "downloads": []
   },
   {
     "name": "Easter Joy Coloring Bundle",
@@ -38,10 +40,11 @@
     "category": "Seasonal",
     "pageCount": 16,
     "tagline": "Celebration with purpose",
-    "emoji": "🌷",
     "gradient": "linear-gradient(135deg, #e533b6, #4f1b84 26%, #2743b6 54%, #1f98ee 74%, #ef4058)",
     "audience": ["Easter services", "Christian classrooms", "Family gatherings"],
     "features": ["16 festive printable pages", "Mix of simple and detailed designs", "Great for holiday tables"],
-    "featured": true
+    "featured": true,
+    "images": [],
+    "downloads": []
   }
 ]

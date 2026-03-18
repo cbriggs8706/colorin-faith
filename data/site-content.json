@@ -1,7 +1,7 @@
 {
   "heroHighlight": {
     "title": "Fruit of the Spirit Coloring Pack",
-    "description": "A bestselling starter set with joyful fruit characters, simple Scripture tie-ins, and printable pages that work beautifully for home or classroom use.",
+    "description": "A bestselling set with joyful fruit characters, simple Scripture tie-ins, and printable pages that work beautifully for home or classroom use.",
     "pages": 12,
     "price": "$7"
   },
@@ -42,25 +42,25 @@
     },
     {
       "title": "Deliver and print",
-      "description": "Connect your final file-delivery workflow so customers can access and print their pages right away."
+      "description": "Customers complete checkout and land on a secure page where they can download the files attached to their product."
     }
   ],
   "faqs": [
     {
       "question": "Are these physical products?",
-      "answer": "No. This starter storefront is set up for digital downloads only, which keeps fulfillment simple and instant."
+      "answer": "No. Every item in the shop is a digital download, so you can check out and start printing right away."
     },
     {
       "question": "How do customers receive their files?",
-      "answer": "The site includes Stripe checkout and success pages now. For launch, connect checkout completion to a secure file delivery method such as emailed links, a download page, or a digital delivery service."
+      "answer": "After payment, customers are returned to a secure order-success page where the files attached to that product are available to download."
     },
     {
       "question": "Can I update products without editing code?",
-      "answer": "Locally, yes. The admin page saves product updates into JSON files. For production, the next step is moving this admin flow to a persistent database or external CMS."
+      "answer": "Yes. Admin can update product details, images, downloads, and featured settings from the dashboard."
     },
     {
-      "question": "Can I collect emails before launch?",
-      "answer": "Yes. The newsletter form stores subscribers in a lightweight local file right now so you can validate the flow before connecting your email platform."
+      "question": "Can I collect subscriber emails?",
+      "answer": "Yes. Visitors can join your email list from the homepage and product pages to hear about new releases, promotions, and freebies."
     }
   ]
 }
