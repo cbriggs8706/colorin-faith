@@ -1,0 +1,66 @@
+{
+  "heroHighlight": {
+    "title": "Fruit of the Spirit Coloring Pack",
+    "description": "A bestselling starter set with joyful fruit characters, simple Scripture tie-ins, and printable pages that work beautifully for home or classroom use.",
+    "pages": 12,
+    "price": "$7"
+  },
+  "valueProps": [
+    {
+      "icon": "🖍️",
+      "title": "Instantly printable",
+      "description": "Customers can buy today and print right away without waiting for shipping.",
+      "accent": "#FFE5B5"
+    },
+    {
+      "icon": "📖",
+      "title": "Faith-filled themes",
+      "description": "From Bible stories to Scripture memory, every collection keeps the message front and center.",
+      "accent": "#CDEBFF"
+    },
+    {
+      "icon": "🎉",
+      "title": "Bright and playful",
+      "description": "Color palettes, shapes, and cheerful compositions feel energetic without becoming chaotic.",
+      "accent": "#FFD6EA"
+    },
+    {
+      "icon": "🏠",
+      "title": "Made for real homes",
+      "description": "Perfect for busy bags, homeschool stations, church classes, and kitchen table creativity.",
+      "accent": "#D7F8E5"
+    }
+  ],
+  "steps": [
+    {
+      "title": "Pick your favorite pack",
+      "description": "Browse bright faith-based collections organized for family use, class time, and seasonal moments."
+    },
+    {
+      "title": "Checkout with Stripe",
+      "description": "Send customers through a secure mobile-friendly Stripe checkout experience with promo code support."
+    },
+    {
+      "title": "Deliver and print",
+      "description": "Connect your final file-delivery workflow so customers can access and print their pages right away."
+    }
+  ],
+  "faqs": [
+    {
+      "question": "Are these physical products?",
+      "answer": "No. This starter storefront is set up for digital downloads only, which keeps fulfillment simple and instant."
+    },
+    {
+      "question": "How do customers receive their files?",
+      "answer": "The site includes Stripe checkout and success pages now. For launch, connect checkout completion to a secure file delivery method such as emailed links, a download page, or a digital delivery service."
+    },
+    {
+      "question": "Can I update products without editing code?",
+      "answer": "Locally, yes. The admin page saves product updates into JSON files. For production, the next step is moving this admin flow to a persistent database or external CMS."
+    },
+    {
+      "question": "Can I collect emails before launch?",
+      "answer": "Yes. The newsletter form stores subscribers in a lightweight local file right now so you can validate the flow before connecting your email platform."
+    }
+  ]
+}

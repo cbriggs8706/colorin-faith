@@ -1,0 +1,47 @@
+[
+  {
+    "name": "Fruit of the Spirit Coloring Pack",
+    "slug": "fruit-of-the-spirit-coloring-pack",
+    "description": "A cheerful printable bundle that helps kids learn the Fruit of the Spirit through friendly illustrations, traceable words, and memory prompts.",
+    "price": 7,
+    "stripePriceId": "price_replace_with_stripe_price_id_1",
+    "category": "Bible Study",
+    "pageCount": 12,
+    "tagline": "Faith meets fun",
+    "emoji": "🍓",
+    "gradient": "linear-gradient(135deg, #ffb400, #ff7a00 18%, #ef4058 46%, #1f98ee 74%, #2743b6)",
+    "audience": ["Homeschool families", "Sunday school", "Quiet time baskets"],
+    "features": ["12 printable coloring pages", "Scripture memory prompts", "Kid-friendly bold outlines"],
+    "featured": true
+  },
+  {
+    "name": "Noah's Ark Adventure Set",
+    "slug": "noahs-ark-adventure-set",
+    "description": "Big smiles, animals, and rainbow details make this pack a playful choice for Bible lesson time and family coloring tables.",
+    "price": 6,
+    "stripePriceId": "price_replace_with_stripe_price_id_2",
+    "category": "Bible Story",
+    "pageCount": 10,
+    "tagline": "Animals, rainbows, and wonder",
+    "emoji": "🌈",
+    "gradient": "linear-gradient(135deg, #1f98ee, #1150b5 34%, #2743b6 54%, #ffb400 82%, #ff7a00)",
+    "audience": ["Preschool ministry", "Church busy bags", "Family activity time"],
+    "features": ["10 themed printable pages", "Story recap moments", "Designed for easy home printing"],
+    "featured": true
+  },
+  {
+    "name": "Easter Joy Coloring Bundle",
+    "slug": "easter-joy-coloring-bundle",
+    "description": "Celebrate resurrection Sunday with bright printable pages made for church events, classroom tables, and meaningful family conversation.",
+    "price": 9,
+    "stripePriceId": "price_replace_with_stripe_price_id_3",
+    "category": "Seasonal",
+    "pageCount": 16,
+    "tagline": "Celebration with purpose",
+    "emoji": "🌷",
+    "gradient": "linear-gradient(135deg, #e533b6, #4f1b84 26%, #2743b6 54%, #1f98ee 74%, #ef4058)",
+    "audience": ["Easter services", "Christian classrooms", "Family gatherings"],
+    "features": ["16 festive printable pages", "Mix of simple and detailed designs", "Great for holiday tables"],
+    "featured": true
+  }
+]

@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f4f7ff;
+  --foreground: #203042;
+  --surface: rgba(255, 255, 255, 0.84);
+  --surface-strong: #ffffff;
+  --surface-pop: rgba(255, 255, 255, 0.74);
+  --brand-sunrise: #ffb400;
+  --brand-tangerine: #ff7a00;
+  --brand-fuchsia: #e533b6;
+  --brand-plum: #4f1b84;
+  --brand-coral: #ef4058;
+  --brand-sky: #1f98ee;
+  --brand-ocean: #1150b5;
+  --brand-indigo: #2743b6;
+  --brand-violet: #5020a4;
+  --brand-mint: #6fd7d0;
+  --brand-ink: #203042;
+  --shadow-soft: 0 24px 60px rgba(32, 48, 66, 0.12);
+  --gradient-ribbon: linear-gradient(
+    135deg,
+    var(--brand-sunrise) 0%,
+    var(--brand-tangerine) 16%,
+    var(--brand-fuchsia) 34%,
+    var(--brand-coral) 48%,
+    var(--brand-sky) 66%,
+    var(--brand-indigo) 82%,
+    var(--brand-violet) 100%
+  );
+  --gradient-cool: linear-gradient(
+    145deg,
+    rgba(31, 152, 238, 0.16),
+    rgba(80, 32, 164, 0.14) 48%,
+    rgba(229, 51, 182, 0.12)
+  );
+  --gradient-warm: linear-gradient(
+    145deg,
+    rgba(255, 180, 0, 0.2),
+    rgba(255, 122, 0, 0.16) 50%,
+    rgba(239, 64, 88, 0.12)
+  );
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(255, 180, 0, 0.24), transparent 28%),
+    radial-gradient(circle at top center, rgba(229, 51, 182, 0.12), transparent 24%),
+    radial-gradient(circle at top right, rgba(31, 152, 238, 0.2), transparent 24%),
+    linear-gradient(180deg, #f4f7ff 0%, #fff8f1 42%, #f3f8ff 100%);
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--foreground);
+  font-family: var(--font-body), sans-serif;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 180, 0, 0.08), transparent 18%),
+    radial-gradient(circle at 88% 8%, rgba(31, 152, 238, 0.1), transparent 20%),
+    radial-gradient(circle at 72% 28%, rgba(229, 51, 182, 0.06), transparent 16%);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.page-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  isolation: isolate;
+}
+
+.page-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.9;
+  background:
+    linear-gradient(90deg, rgba(255, 180, 0, 0.04), transparent 18%),
+    linear-gradient(90deg, transparent 18%, rgba(229, 51, 182, 0.04) 34%, transparent 48%),
+    linear-gradient(90deg, transparent 48%, rgba(31, 152, 238, 0.045) 68%, transparent 82%),
+    linear-gradient(90deg, transparent 82%, rgba(239, 64, 88, 0.04));
+}
+
+.card-surface {
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.76)),
+    var(--gradient-cool);
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-soft);
+}
+
+.section-title {
+  font-family: var(--font-display), cursive;
+  letter-spacing: 0.01em;
+}
+
+.pill-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.7)),
+    var(--gradient-cool);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  border: 0;
+  background: var(--gradient-ribbon);
+  color: white;
+  padding: 0.95rem 1.4rem;
+  font-weight: 800;
+  box-shadow: 0 14px 30px rgba(31, 80, 181, 0.24);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+.primary-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 36px rgba(80, 32, 164, 0.28);
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+  transform: none;
+}
+
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(32, 48, 66, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.72)),
+    var(--gradient-cool);
+  padding: 0.95rem 1.4rem;
+  font-weight: 800;
+}
+
+.field {
+  width: 100%;
+  border-radius: 1.2rem;
+  border: 1px solid rgba(32, 48, 66, 0.12);
+  background: rgba(255, 255, 255, 0.88);
+  padding: 0.95rem 1rem;
+  color: var(--foreground);
+  outline: none;
+}
+
+.field:focus {
+  border-color: rgba(31, 152, 238, 0.45);
+  box-shadow: 0 0 0 4px rgba(31, 152, 238, 0.12);
+}
+
+.gradient-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.5)),
+    var(--gradient-ribbon);
+}
+
+.gradient-soft {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.7)),
+    var(--gradient-warm);
+}
+
+.gradient-cool-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.7)),
+    var(--gradient-cool);
+}
