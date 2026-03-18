@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAdminUser } from "@/lib/auth";
 import { deleteProduct, updateProduct } from "@/lib/store";
 import type { ProductInput } from "@/lib/types";
 
@@ -9,6 +10,12 @@ type ProductRouteProps = {
 };
 
 export async function PUT(request: Request, { params }: ProductRouteProps) {
+  const user = await getAdminUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   try {
     const { slug } = await params;
     const payload = (await request.json()) as ProductInput;
@@ -27,6 +34,12 @@ export async function DELETE(
   _request: Request,
   { params }: ProductRouteProps,
 ) {
+  const user = await getAdminUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
   try {
     const { slug } = await params;
     await deleteProduct(slug);

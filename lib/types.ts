@@ -22,6 +22,33 @@ export type Subscriber = {
   createdAt: string;
 };
 
+export type ProductRecord = {
+  name: string;
+  slug: string;
+  description: string;
+  price: number;
+  stripe_price_id: string;
+  category: string;
+  page_count: number;
+  tagline: string;
+  emoji: string;
+  gradient: string;
+  audience: string[];
+  features: string[];
+  featured: boolean;
+};
+
+export type SubscriberRecord = {
+  email: string;
+  first_name: string;
+  created_at: string;
+};
+
+export type SiteContentRecord = {
+  key: string;
+  value: SiteContent;
+};
+
 export type SiteContent = {
   heroHighlight: {
     title: string;

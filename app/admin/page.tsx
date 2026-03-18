@@ -1,4 +1,6 @@
+import { AdminLogoutButton } from "@/components/admin-logout-button";
 import { AdminProductManager } from "@/components/admin-product-manager";
+import { requireAdminUser } from "@/lib/auth";
 import { getProducts, getSiteContent, getSubscribers } from "@/lib/store";
 
 export const metadata = {
@@ -6,6 +8,7 @@ export const metadata = {
 };
 
 export default async function AdminPage() {
+  const user = await requireAdminUser();
   const [products, siteContent, subscribers] = await Promise.all([
     getProducts(),
     getSiteContent(),
@@ -20,10 +23,16 @@ export default async function AdminPage() {
           Manage products and launch-readiness from one simple dashboard.
         </h1>
         <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
-          This starter uses local JSON files as a lightweight CMS so you can edit
-          products without adding a database on day one. For production hosting on
-          platforms like Vercel, move these records into a database or external CMS.
+          Supabase auth now protects this dashboard. When your Supabase service
+          role key is configured, product and subscriber data will be read from
+          your hosted database instead of local JSON files.
         </p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-bold text-slate-600">
+            Signed in as <span className="text-[var(--brand-ink)]">{user.email}</span>
+          </p>
+          <AdminLogoutButton />
+        </div>
       </section>
 
       <section className="grid gap-5 md:grid-cols-3">

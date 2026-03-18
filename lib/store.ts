@@ -1,11 +1,24 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { Product, ProductInput, SiteContent, Subscriber } from "@/lib/types";
+import {
+  hasSupabaseDatabaseEnv,
+} from "@/lib/supabase/env";
+import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
+import type {
+  Product,
+  ProductInput,
+  ProductRecord,
+  SiteContent,
+  SiteContentRecord,
+  Subscriber,
+  SubscriberRecord,
+} from "@/lib/types";
 
 const dataDirectory = path.join(process.cwd(), "data");
 const productsPath = path.join(dataDirectory, "products.json");
 const subscribersPath = path.join(dataDirectory, "subscribers.json");
 const siteContentPath = path.join(dataDirectory, "site-content.json");
+const siteContentKey = "homepage";
 
 async function ensureDataFiles() {
   await fs.mkdir(dataDirectory, { recursive: true });
@@ -61,7 +74,69 @@ function normalizeProduct(input: ProductInput): Product {
   };
 }
 
+function productFromRecord(record: ProductRecord): Product {
+  return {
+    name: record.name,
+    slug: record.slug,
+    description: record.description,
+    price: Number(record.price),
+    stripePriceId: record.stripe_price_id,
+    category: record.category,
+    pageCount: Number(record.page_count),
+    tagline: record.tagline,
+    emoji: record.emoji,
+    gradient: record.gradient,
+    audience: record.audience ?? [],
+    features: record.features ?? [],
+    featured: Boolean(record.featured),
+  };
+}
+
+function productToRecord(product: Product): ProductRecord {
+  return {
+    name: product.name,
+    slug: product.slug,
+    description: product.description,
+    price: product.price,
+    stripe_price_id: product.stripePriceId,
+    category: product.category,
+    page_count: product.pageCount,
+    tagline: product.tagline,
+    emoji: product.emoji,
+    gradient: product.gradient,
+    audience: product.audience,
+    features: product.features,
+    featured: product.featured,
+  };
+}
+
+function subscriberFromRecord(record: SubscriberRecord): Subscriber {
+  return {
+    email: record.email,
+    firstName: record.first_name,
+    createdAt: record.created_at,
+  };
+}
+
 export async function getProducts() {
+  if (hasSupabaseDatabaseEnv()) {
+    try {
+      const supabase = createSupabaseServiceRoleClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("name", { ascending: true });
+
+      if (error) {
+        throw error;
+      }
+
+      return (data as ProductRecord[]).map(productFromRecord);
+    } catch {
+      return readJsonFile<Product[]>(productsPath);
+    }
+  }
+
   const products = await readJsonFile<Product[]>(productsPath);
   return products.sort((left, right) => left.name.localeCompare(right.name));
 }
@@ -79,6 +154,22 @@ export async function getProductBySlug(slug: string) {
 
 export async function createProduct(input: ProductInput) {
   const product = normalizeProduct(input);
+
+  if (hasSupabaseDatabaseEnv()) {
+    const supabase = createSupabaseServiceRoleClient();
+    const { data, error } = await supabase
+      .from("products")
+      .insert(productToRecord(product))
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Unable to save Supabase product: ${error.message}`);
+    }
+
+    return productFromRecord(data as ProductRecord);
+  }
+
   const products = await getProducts();
 
   if (products.some((entry) => entry.slug === product.slug)) {
@@ -92,6 +183,23 @@ export async function createProduct(input: ProductInput) {
 
 export async function updateProduct(slug: string, input: ProductInput) {
   const product = normalizeProduct(input);
+
+  if (hasSupabaseDatabaseEnv()) {
+    const supabase = createSupabaseServiceRoleClient();
+    const { data, error } = await supabase
+      .from("products")
+      .update(productToRecord(product))
+      .eq("slug", slug)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Unable to update Supabase product: ${error.message}`);
+    }
+
+    return productFromRecord(data as ProductRecord);
+  }
+
   const products = await getProducts();
   const target = products.find((entry) => entry.slug === slug);
 
@@ -109,6 +217,17 @@ export async function updateProduct(slug: string, input: ProductInput) {
 }
 
 export async function deleteProduct(slug: string) {
+  if (hasSupabaseDatabaseEnv()) {
+    const supabase = createSupabaseServiceRoleClient();
+    const { error } = await supabase.from("products").delete().eq("slug", slug);
+
+    if (error) {
+      throw new Error(`Unable to delete Supabase product: ${error.message}`);
+    }
+
+    return;
+  }
+
   const products = await getProducts();
   const nextProducts = products.filter((product) => product.slug !== slug);
 
@@ -120,6 +239,24 @@ export async function deleteProduct(slug: string) {
 }
 
 export async function getSubscribers() {
+  if (hasSupabaseDatabaseEnv()) {
+    try {
+      const supabase = createSupabaseServiceRoleClient();
+      const { data, error } = await supabase
+        .from("subscribers")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return (data as SubscriberRecord[]).map(subscriberFromRecord);
+    } catch {
+      return readJsonFile<Subscriber[]>(subscribersPath);
+    }
+  }
+
   return readJsonFile<Subscriber[]>(subscribersPath);
 }
 
@@ -134,6 +271,23 @@ export async function addSubscriber({
 
   if (!normalizedEmail || !normalizedEmail.includes("@")) {
     throw new Error("Enter a valid email address.");
+  }
+
+  if (hasSupabaseDatabaseEnv()) {
+    const supabase = createSupabaseServiceRoleClient();
+    const { error } = await supabase.from("subscribers").upsert(
+      {
+        email: normalizedEmail,
+        first_name: firstName.trim(),
+      },
+      { onConflict: "email" },
+    );
+
+    if (error) {
+      throw new Error(`Unable to save subscriber: ${error.message}`);
+    }
+
+    return { message: "Thanks! You have been added to the launch list." };
   }
 
   const subscribers = await getSubscribers();
@@ -154,5 +308,24 @@ export async function addSubscriber({
 }
 
 export async function getSiteContent() {
+  if (hasSupabaseDatabaseEnv()) {
+    try {
+      const supabase = createSupabaseServiceRoleClient();
+      const { data, error } = await supabase
+        .from("site_content")
+        .select("*")
+        .eq("key", siteContentKey)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return (data as SiteContentRecord).value;
+    } catch {
+      return readJsonFile<SiteContent>(siteContentPath);
+    }
+  }
+
   return readJsonFile<SiteContent>(siteContentPath);
 }
