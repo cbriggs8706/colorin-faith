@@ -18,3 +18,13 @@ export async function getCheckoutSession(sessionId: string) {
   const stripe = getStripe();
   return stripe.checkout.sessions.retrieve(sessionId);
 }
+
+export async function getCheckoutSessionLineItems(sessionId: string) {
+  const stripe = getStripe();
+  const response = await stripe.checkout.sessions.listLineItems(sessionId, {
+    limit: 100,
+    expand: ["data.price"],
+  });
+
+  return response.data;
+}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
 import "./globals.css";
-import { SiteFooter } from "@/components/site-footer";
+import { CartProvider } from "@/components/cart-provider";
 import { SiteHeader } from "@/components/site-header";
 
 const displayFont = Baloo_2({
@@ -61,16 +61,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={`${displayFont.variable} ${bodyFont.variable} scroll-smooth`}
     >
       <body>
-        <div className="page-shell">
-          <SiteHeader />
-          <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-16 sm:px-6 lg:px-8">
-            {children}
-          </main>
-          <SiteFooter />
-        </div>
+        <CartProvider>
+          <div className="page-shell">
+            <SiteHeader />
+            <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-16 sm:px-6 lg:px-8">
+              {children}
+            </main>
+          </div>
+        </CartProvider>
       </body>
     </html>
   );

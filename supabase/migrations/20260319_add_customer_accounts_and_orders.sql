@@ -1,50 +1,12 @@
 create extension if not exists pgcrypto;
 
-create table if not exists public.products (
-  slug text primary key,
-  name text not null,
-  description text not null,
-  price numeric(10,2) not null,
-  stripe_price_id text not null default '',
-  category text not null,
-  page_count integer not null,
-  tagline text not null,
-  gradient text not null,
-  audience text[] not null default '{}',
-  features text[] not null default '{}',
-  featured boolean not null default false,
-  listing_image_path text not null default '',
-  images jsonb not null default '[]'::jsonb,
-  downloads jsonb not null default '[]'::jsonb,
-  variants jsonb not null default '[]'::jsonb,
-  created_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.subscribers (
-  email text primary key,
-  first_name text not null default '',
-  created_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.site_content (
-  key text primary key,
-  value jsonb not null
-);
-
 create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   name text,
   email text unique,
   "emailVerified" timestamptz,
-  image text,
-  username text,
-  password_hash text,
-  is_admin boolean not null default false
+  image text
 );
-
-create unique index if not exists users_username_lower_key
-  on public.users (lower(username))
-  where username is not null;
 
 create table if not exists public.accounts (
   id uuid primary key default gen_random_uuid(),
@@ -82,6 +44,15 @@ create table if not exists public.verification_tokens (
 create unique index if not exists verification_tokens_identifier_token_key
   on public.verification_tokens(identifier, token);
 
+alter table public.users
+  add column if not exists username text,
+  add column if not exists password_hash text,
+  add column if not exists is_admin boolean not null default false;
+
+create unique index if not exists users_username_lower_key
+  on public.users (lower(username))
+  where username is not null;
+
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   customer_email text not null,
@@ -89,9 +60,6 @@ create table if not exists public.orders (
   stripe_session_id text not null,
   product_slug text not null,
   product_name text not null,
-  variant_id text not null default 'standard',
-  variant_name text not null default 'Standard',
-  variant_page_count integer not null default 1,
   quantity integer not null default 1,
   amount_total integer,
   currency text,
@@ -101,15 +69,17 @@ create table if not exists public.orders (
   created_at timestamptz not null default timezone('utc', now())
 );
 
+alter table public.orders
+  add column if not exists stripe_session_id text,
+  add column if not exists quantity integer not null default 1,
+  add column if not exists receipt_emailed_at timestamptz;
+
 create unique index if not exists orders_session_product_key
-  on public.orders (stripe_session_id, product_slug, variant_id);
+  on public.orders (stripe_session_id, product_slug);
 
 create index if not exists orders_customer_email_idx
   on public.orders (customer_email, created_at desc);
 
-alter table public.products enable row level security;
-alter table public.subscribers enable row level security;
-alter table public.site_content enable row level security;
 alter table public.users enable row level security;
 alter table public.accounts enable row level security;
 alter table public.sessions enable row level security;

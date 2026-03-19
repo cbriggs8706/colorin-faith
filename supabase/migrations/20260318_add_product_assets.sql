@@ -1,4 +1,5 @@
 alter table public.products
+  add column if not exists listing_image_path text not null default '',
   add column if not exists images jsonb not null default '[]'::jsonb,
   add column if not exists downloads jsonb not null default '[]'::jsonb;
 

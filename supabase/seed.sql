@@ -11,8 +11,10 @@ insert into public.products (
   audience,
   features,
   featured,
+  listing_image_path,
   images,
-  downloads
+  downloads,
+  variants
 )
 values
   (
@@ -28,8 +30,10 @@ values
     '{"Homeschool families","Sunday school","Quiet time baskets"}',
     '{"12 printable coloring pages","Scripture memory prompts","Kid-friendly bold outlines"}',
     true,
+    '',
     '[]'::jsonb,
-    '[]'::jsonb
+    '[]'::jsonb,
+    '[{"id":"12-pages","name":"12 pages","price":7,"stripePriceId":"price_replace_with_stripe_price_id_1","pageCount":12,"downloads":[]}]'::jsonb
   ),
   (
     'noahs-ark-adventure-set',
@@ -44,8 +48,10 @@ values
     '{"Preschool ministry","Church busy bags","Family activity time"}',
     '{"10 themed printable pages","Story recap moments","Designed for easy home printing"}',
     true,
+    '',
     '[]'::jsonb,
-    '[]'::jsonb
+    '[]'::jsonb,
+    '[{"id":"10-pages","name":"10 pages","price":6,"stripePriceId":"price_replace_with_stripe_price_id_2","pageCount":10,"downloads":[]}]'::jsonb
   ),
   (
     'easter-joy-coloring-bundle',
@@ -60,8 +66,10 @@ values
     '{"Easter services","Christian classrooms","Family gatherings"}',
     '{"16 festive printable pages","Mix of simple and detailed designs","Great for holiday tables"}',
     true,
+    '',
     '[]'::jsonb,
-    '[]'::jsonb
+    '[]'::jsonb,
+    '[{"id":"16-pages","name":"16 pages","price":9,"stripePriceId":"price_replace_with_stripe_price_id_3","pageCount":16,"downloads":[]}]'::jsonb
   )
 on conflict (slug) do update set
   name = excluded.name,
@@ -75,8 +83,10 @@ on conflict (slug) do update set
   audience = excluded.audience,
   features = excluded.features,
   featured = excluded.featured,
+  listing_image_path = excluded.listing_image_path,
   images = excluded.images,
-  downloads = excluded.downloads;
+  downloads = excluded.downloads,
+  variants = excluded.variants;
 
 insert into public.site_content (key, value)
 values (

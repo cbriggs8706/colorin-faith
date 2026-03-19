@@ -60,6 +60,7 @@ export function ProductImageGallery({ images }: ProductImageGalleryProps) {
               alt={images[0].alt}
               className="object-cover transition duration-200 group-hover:scale-[1.02]"
               fill
+              loading="eager"
               src={images[0].src}
               unoptimized
             />

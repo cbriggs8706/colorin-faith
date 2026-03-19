@@ -7,7 +7,11 @@ import {
 } from "@/lib/product-assets";
 import { hasSupabaseDatabaseEnv } from "@/lib/supabase/env";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
-import { getProductBySlug, updateProductDownloads, updateProductImages } from "@/lib/store";
+import {
+  getProductBySlug,
+  updateProductImages,
+  updateProductVariantDownloads,
+} from "@/lib/store";
 import type { ProductDownload, ProductImage } from "@/lib/types";
 
 type ProductAssetRouteProps = {
@@ -47,6 +51,7 @@ export async function POST(request: Request, { params }: ProductAssetRouteProps)
     const type = String(formData.get("type") ?? "");
     const label = String(formData.get("label") ?? "");
     const alt = String(formData.get("alt") ?? "");
+    const variantId = String(formData.get("variantId") ?? "").trim();
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "File is required." }, { status: 400 });
@@ -83,14 +88,27 @@ export async function POST(request: Request, { params }: ProductAssetRouteProps)
       return NextResponse.json(updatedProduct);
     }
 
+    if (!variantId) {
+      return NextResponse.json(
+        { error: "Variant ID is required for download uploads." },
+        { status: 400 },
+      );
+    }
+
+    const variant = product.variants.find((entry) => entry.id === variantId);
+
+    if (!variant) {
+      return NextResponse.json({ error: "Variant not found." }, { status: 404 });
+    }
+
     const nextDownloads: ProductDownload[] = [
-      ...product.downloads,
+      ...variant.downloads,
       {
         path,
         label: label.trim() || file.name,
       },
     ];
-    const updatedProduct = await updateProductDownloads(slug, nextDownloads);
+    const updatedProduct = await updateProductVariantDownloads(slug, variantId, nextDownloads);
     return NextResponse.json(updatedProduct);
   } catch (error) {
     const message =
@@ -125,6 +143,7 @@ export async function DELETE(request: Request, { params }: ProductAssetRouteProp
     const body = (await request.json()) as {
       type?: "image" | "download";
       path?: string;
+      variantId?: string;
     };
 
     if (!body.path || (body.type !== "image" && body.type !== "download")) {
@@ -147,9 +166,23 @@ export async function DELETE(request: Request, { params }: ProductAssetRouteProp
       return NextResponse.json(updatedProduct);
     }
 
-    const updatedProduct = await updateProductDownloads(
+    if (!body.variantId) {
+      return NextResponse.json(
+        { error: "Variant ID is required for download removal." },
+        { status: 400 },
+      );
+    }
+
+    const variant = product.variants.find((entry) => entry.id === body.variantId);
+
+    if (!variant) {
+      return NextResponse.json({ error: "Variant not found." }, { status: 404 });
+    }
+
+    const updatedProduct = await updateProductVariantDownloads(
       slug,
-      product.downloads.filter((download) => download.path !== body.path),
+      body.variantId,
+      variant.downloads.filter((download) => download.path !== body.path),
     );
     return NextResponse.json(updatedProduct);
   } catch (error) {

@@ -50,6 +50,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
     src: getProductImageUrl(image.path),
     alt: image.alt || product.name,
   }));
+  const minPrice = Math.min(...product.variants.map((variant) => variant.price));
+  const maxPageCount = Math.max(...product.variants.map((variant) => variant.pageCount));
 
   return (
     <div className="flex flex-col gap-8 py-6 sm:py-8">
@@ -85,11 +87,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 Instant download
               </p>
               <p className="mt-3 text-4xl font-black text-[var(--brand-ink)]">
-                ${product.price.toFixed(2)}
+                From ${minPrice.toFixed(2)}
               </p>
             </div>
             <span className="rounded-full bg-white/75 px-3 py-2 text-sm font-bold text-slate-700">
-              {product.pageCount} pages
+              Up to {maxPageCount} pages
             </span>
           </div>
           <p className="mt-4 text-sm leading-6 text-slate-700">
@@ -144,7 +146,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 to a download page with access to the files attached to this product.
               </p>
             </div>
-            <Link className="secondary-button" href="/shop">
+            <Link className="secondary-button" href="/#shop">
               Browse more printables
             </Link>
           </div>

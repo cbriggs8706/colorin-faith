@@ -17,8 +17,8 @@ export default function CancelPage() {
           or product page and let them try again when ready.
         </p>
         <div className="mt-6 flex justify-center">
-          <Link className="primary-button" href="/shop">
-            Return to shop
+          <Link className="primary-button" href="/#shop">
+            Return to printables
           </Link>
         </div>
       </section>

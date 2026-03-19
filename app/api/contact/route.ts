@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { getAdminEmails } from "@/lib/supabase/env";
+import {
+  getAdminEmails,
+  getContactFromEmail,
+  getResendApiKey,
+} from "@/lib/supabase/env";
 
 function validateEmail(email: string) {
   return email.includes("@") && email.includes(".");
@@ -30,16 +34,11 @@ export async function POST(request: Request) {
     }
 
     const adminEmails = getAdminEmails();
-    const resendApiKey = process.env.RESEND_API_KEY;
-    const fromAddress =
-      process.env.CONTACT_FROM_EMAIL ?? "Color in Faith <onboarding@resend.dev>";
+    const resendApiKey = getResendApiKey();
+    const fromAddress = getContactFromEmail();
 
     if (adminEmails.length === 0) {
       throw new Error("Missing ADMIN_EMAILS environment variable.");
-    }
-
-    if (!resendApiKey) {
-      throw new Error("Missing RESEND_API_KEY environment variable.");
     }
 
     const response = await fetch("https://api.resend.com/emails", {

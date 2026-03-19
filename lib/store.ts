@@ -11,6 +11,7 @@ import type {
   ProductImage,
   ProductInput,
   ProductRecord,
+  ProductVariant,
   SiteContent,
   SiteContentRecord,
   Subscriber,
@@ -25,10 +26,12 @@ const siteContentKey = "homepage";
 
 function mapSupabaseProductError(action: "save" | "update" | "delete", message: string) {
   if (
+    message.includes("Could not find the 'listing_image_path' column") ||
     message.includes("Could not find the 'downloads' column") ||
-    message.includes("Could not find the 'images' column")
+    message.includes("Could not find the 'images' column") ||
+    message.includes("Could not find the 'variants' column")
   ) {
-    return `Unable to ${action} Supabase product: your Supabase products table is missing the new asset columns. Run the SQL in supabase/schema.sql (or the migration in supabase/migrations) and refresh the schema cache.`;
+    return `Unable to ${action} Supabase product: your Supabase products table is missing the latest product asset columns. Run the SQL in supabase/schema.sql (or the migration in supabase/migrations) and refresh the schema cache.`;
   }
 
   return `Unable to ${action} Supabase product: ${message}`;
@@ -61,6 +64,88 @@ async function writeJsonFile<T>(filePath: string, value: T) {
   await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf8");
 }
 
+function normalizeVariantId(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function getFallbackVariantId(input: {
+  id?: string;
+  name?: string;
+  pageCount?: number;
+}) {
+  const fromId = normalizeVariantId(input.id ?? "");
+
+  if (fromId) {
+    return fromId;
+  }
+
+  const fromName = normalizeVariantId(input.name ?? "");
+
+  if (fromName) {
+    return fromName;
+  }
+
+  const pageCount = Number(input.pageCount ?? 0);
+  return pageCount > 0 ? `${pageCount}-pages` : "standard";
+}
+
+function getDefaultVariantValues(input: {
+  pageCount?: number;
+  price?: number;
+  stripePriceId?: string;
+  downloads?: ProductDownload[];
+}) {
+  const pageCount = Number(input.pageCount ?? 1);
+  return {
+    id: getFallbackVariantId({ pageCount }),
+    name: `${pageCount} pages`,
+    pageCount,
+    price: Number(input.price ?? 0),
+    stripePriceId: String(input.stripePriceId ?? ""),
+    downloads: normalizeDownloads(input.downloads ?? []),
+  } satisfies ProductVariant;
+}
+
+function normalizeVariants(
+  variants: ProductVariant[] | undefined,
+  fallback: {
+    pageCount?: number;
+    price?: number;
+    stripePriceId?: string;
+    downloads?: ProductDownload[];
+  },
+) {
+  const normalized = (variants ?? [])
+    .map((variant) => {
+      const id = getFallbackVariantId(variant);
+
+      return {
+        id,
+        name: variant.name.trim() || `${Math.max(1, Number(variant.pageCount))} pages`,
+        price: Number(variant.price),
+        stripePriceId: variant.stripePriceId.trim(),
+        pageCount: Math.max(1, Number(variant.pageCount)),
+        downloads: normalizeDownloads(variant.downloads ?? []),
+      } satisfies ProductVariant;
+    })
+    .filter((variant, index, all) => {
+      return (
+        variant.id &&
+        Number.isFinite(variant.price) &&
+        variant.price >= 0 &&
+        !all.some((candidate, candidateIndex) => {
+          return candidateIndex < index && candidate.id === variant.id;
+        })
+      );
+    });
+
+  return normalized.length > 0 ? normalized : [getDefaultVariantValues(fallback)];
+}
+
 function normalizeProduct(input: ProductInput): Product {
   if (!input.name.trim()) {
     throw new Error("Product name is required.");
@@ -70,22 +155,32 @@ function normalizeProduct(input: ProductInput): Product {
     throw new Error("Product slug is required.");
   }
 
+  const images = normalizeImages(input.images);
+  const listingImagePath =
+    images.some((image) => image.path === input.listingImagePath)
+      ? input.listingImagePath.trim()
+      : (images[0]?.path ?? "");
+  const variants = normalizeVariants(input.variants, input);
+  const defaultVariant = variants[0];
+
   return {
     ...input,
     name: input.name.trim(),
     slug: input.slug.trim(),
     description: input.description.trim(),
-    stripePriceId: input.stripePriceId.trim(),
     category: input.category.trim(),
     tagline: input.tagline.trim(),
     gradient: input.gradient.trim() || getDefaultProductGradient(),
-    price: Number(input.price),
-    pageCount: Number(input.pageCount),
+    price: defaultVariant.price,
+    stripePriceId: defaultVariant.stripePriceId,
+    pageCount: defaultVariant.pageCount,
     audience: input.audience.map((entry) => entry.trim()).filter(Boolean),
     features: input.features.map((entry) => entry.trim()).filter(Boolean),
     featured: Boolean(input.featured),
-    images: normalizeImages(input.images),
-    downloads: normalizeDownloads(input.downloads),
+    listingImagePath,
+    images,
+    downloads: defaultVariant.downloads,
+    variants,
   };
 }
 
@@ -108,40 +203,54 @@ function normalizeDownloads(downloads: ProductDownload[]) {
 }
 
 function productFromRecord(record: ProductRecord): Product {
+  const variants = normalizeVariants(record.variants, {
+    pageCount: record.page_count,
+    price: record.price,
+    stripePriceId: record.stripe_price_id,
+    downloads: record.downloads ?? [],
+  });
+  const defaultVariant = variants[0];
+
   return {
     name: record.name,
     slug: record.slug,
     description: record.description,
-    price: Number(record.price),
-    stripePriceId: record.stripe_price_id,
+    price: defaultVariant.price,
+    stripePriceId: defaultVariant.stripePriceId,
     category: record.category,
-    pageCount: Number(record.page_count),
+    pageCount: defaultVariant.pageCount,
     tagline: record.tagline,
     gradient: record.gradient,
     audience: record.audience ?? [],
     features: record.features ?? [],
     featured: Boolean(record.featured),
+    listingImagePath: record.listing_image_path ?? record.images?.[0]?.path ?? "",
     images: record.images ?? [],
-    downloads: record.downloads ?? [],
+    downloads: defaultVariant.downloads,
+    variants,
   };
 }
 
 function productToRecord(product: Product): ProductRecord {
+  const defaultVariant = product.variants[0] ?? getDefaultVariantValues(product);
+
   return {
     name: product.name,
     slug: product.slug,
     description: product.description,
-    price: product.price,
-    stripe_price_id: product.stripePriceId,
+    price: defaultVariant.price,
+    stripe_price_id: defaultVariant.stripePriceId,
     category: product.category,
-    page_count: product.pageCount,
+    page_count: defaultVariant.pageCount,
     tagline: product.tagline,
     gradient: product.gradient,
     audience: product.audience,
     features: product.features,
     featured: product.featured,
+    listing_image_path: product.listingImagePath,
     images: product.images,
-    downloads: product.downloads,
+    downloads: defaultVariant.downloads,
+    variants: product.variants,
   };
 }
 
@@ -168,12 +277,15 @@ export async function getProducts() {
 
       return (data as ProductRecord[]).map(productFromRecord);
     } catch {
-      return readJsonFile<Product[]>(productsPath);
+      const products = await readJsonFile<ProductInput[]>(productsPath);
+      return products.map(normalizeProduct);
     }
   }
 
-  const products = await readJsonFile<Product[]>(productsPath);
-  return products.sort((left, right) => left.name.localeCompare(right.name));
+  const products = await readJsonFile<ProductInput[]>(productsPath);
+  return products
+    .map(normalizeProduct)
+    .sort((left, right) => left.name.localeCompare(right.name));
 }
 
 export async function getFeaturedProducts() {
@@ -286,8 +398,9 @@ export async function updateProductImages(slug: string, images: ProductImage[]) 
   });
 }
 
-export async function updateProductDownloads(
+export async function updateProductVariantDownloads(
   slug: string,
+  variantId: string,
   downloads: ProductDownload[],
 ) {
   const product = await getProductBySlug(slug);
@@ -296,9 +409,22 @@ export async function updateProductDownloads(
     throw new Error("Product not found.");
   }
 
+  const hasVariant = product.variants.some((variant) => variant.id === variantId);
+
+  if (!hasVariant) {
+    throw new Error("Variant not found.");
+  }
+
   return updateProduct(slug, {
     ...product,
-    downloads,
+    variants: product.variants.map((variant) =>
+      variant.id === variantId
+        ? {
+            ...variant,
+            downloads,
+          }
+        : variant,
+    ),
   });
 }
 

@@ -11,11 +11,19 @@ export type Product = {
   audience: string[];
   features: string[];
   featured: boolean;
+  listingImagePath: string;
   images: ProductImage[];
   downloads: ProductDownload[];
+  variants: ProductVariant[];
 };
 
 export type ProductInput = Product;
+
+export type CartItem = {
+  slug: string;
+  variantId: string;
+  quantity: number;
+};
 
 export type ProductImage = {
   path: string;
@@ -25,6 +33,15 @@ export type ProductImage = {
 export type ProductDownload = {
   path: string;
   label: string;
+};
+
+export type ProductVariant = {
+  id: string;
+  name: string;
+  price: number;
+  stripePriceId: string;
+  pageCount: number;
+  downloads: ProductDownload[];
 };
 
 export type Subscriber = {
@@ -46,8 +63,10 @@ export type ProductRecord = {
   audience: string[];
   features: string[];
   featured: boolean;
+  listing_image_path: string;
   images: ProductImage[];
   downloads: ProductDownload[];
+  variants?: ProductVariant[];
 };
 
 export type SubscriberRecord = {
@@ -89,4 +108,15 @@ export type ContactSubmission = {
   email: string;
   message: string;
   createdAt: string;
+};
+
+export type PurchasedItem = {
+  slug: string;
+  name: string;
+  variantId: string;
+  variantName: string;
+  pageCount: number;
+  quantity: number;
+  amountTotal: number | null;
+  downloads: Array<{ label: string; path: string; signedUrl: string }>;
 };

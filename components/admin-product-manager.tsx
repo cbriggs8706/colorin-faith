@@ -7,23 +7,34 @@ import {
   getDefaultProductGradient,
   getProductImageUrl,
 } from "@/lib/product-assets";
-import type { Product, ProductInput } from "@/lib/types";
+import type { Product, ProductInput, ProductVariant } from "@/lib/types";
+
+const emptyVariant: ProductVariant = {
+  id: "standard",
+  name: "Standard",
+  price: 5,
+  stripePriceId: "",
+  pageCount: 1,
+  downloads: [],
+};
 
 const emptyForm: ProductInput = {
   name: "",
   slug: "",
   description: "",
-  price: 5,
-  stripePriceId: "",
+  price: emptyVariant.price,
+  stripePriceId: emptyVariant.stripePriceId,
   category: "",
-  pageCount: 1,
+  pageCount: emptyVariant.pageCount,
   tagline: "",
   gradient: getDefaultProductGradient(),
   audience: [],
   features: [],
   featured: false,
+  listingImagePath: "",
   images: [],
   downloads: [],
+  variants: [emptyVariant],
 };
 
 function toTextList(value: string) {
@@ -31,6 +42,22 @@ function toTextList(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function normalizeVariantId(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function createVariantDraft(index: number): ProductVariant {
+  return {
+    ...emptyVariant,
+    id: `variant-${index + 1}`,
+    name: `Variant ${index + 1}`,
+  };
 }
 
 function fromProduct(product: Product): ProductInput {
@@ -47,8 +74,10 @@ function fromProduct(product: Product): ProductInput {
     audience: product.audience,
     features: product.features,
     featured: product.featured,
+    listingImagePath: product.listingImagePath,
     images: product.images,
     downloads: product.downloads,
+    variants: product.variants,
   };
 }
 
@@ -68,6 +97,9 @@ export function AdminProductManager({
   const [featuresText, setFeaturesText] = useState(
     initialProducts[0]?.features.join(", ") ?? "",
   );
+  const [selectedVariantId, setSelectedVariantId] = useState(
+    initialProducts[0]?.variants[0]?.id ?? emptyVariant.id,
+  );
   const [imageAlt, setImageAlt] = useState("");
   const [downloadLabel, setDownloadLabel] = useState("");
   const [status, setStatus] = useState("");
@@ -80,12 +112,47 @@ export function AdminProductManager({
     () => products.find((product) => product.slug === selectedSlug),
     [products, selectedSlug],
   );
+  const selectedVariant =
+    form.variants.find((variant) => variant.id === selectedVariantId) ?? form.variants[0];
+
+  function setVariants(nextVariants: ProductVariant[]) {
+    setForm((current) => {
+      const variants = nextVariants.length > 0 ? nextVariants : [createVariantDraft(0)];
+      const primaryVariant = variants[0];
+
+      return {
+        ...current,
+        variants,
+        price: primaryVariant.price,
+        stripePriceId: primaryVariant.stripePriceId,
+        pageCount: primaryVariant.pageCount,
+        downloads: primaryVariant.downloads,
+      };
+    });
+    setSelectedVariantId((current) => {
+      return nextVariants.some((variant) => variant.id === current)
+        ? current
+        : (nextVariants[0]?.id ?? createVariantDraft(0).id);
+    });
+  }
+
+  function updateVariant(
+    variantId: string,
+    updater: (variant: ProductVariant) => ProductVariant,
+  ) {
+    setVariants(
+      form.variants.map((variant) => {
+        return variant.id === variantId ? updater(variant) : variant;
+      }),
+    );
+  }
 
   function loadProduct(product: Product) {
     setSelectedSlug(product.slug);
     setForm(fromProduct(product));
     setAudienceText(product.audience.join(", "));
     setFeaturesText(product.features.join(", "));
+    setSelectedVariantId(product.variants[0]?.id ?? emptyVariant.id);
     setImageAlt("");
     setDownloadLabel("");
     setStatus("");
@@ -94,10 +161,9 @@ export function AdminProductManager({
 
   function syncProduct(saved: Product, previousSlug = selectedSlug) {
     setProducts((current) => {
-      const next = [
-        ...current.filter((product) => product.slug !== previousSlug),
-        saved,
-      ].sort((left, right) => left.name.localeCompare(right.name));
+      const next = [...current.filter((product) => product.slug !== previousSlug), saved].sort(
+        (left, right) => left.name.localeCompare(right.name),
+      );
 
       return next;
     });
@@ -114,6 +180,7 @@ export function AdminProductManager({
     setForm(emptyForm);
     setAudienceText("");
     setFeaturesText("");
+    setSelectedVariantId(emptyVariant.id);
     setImageAlt("");
     setDownloadLabel("");
     setStatus("");
@@ -129,15 +196,21 @@ export function AdminProductManager({
       ...form,
       audience: toTextList(audienceText),
       features: toTextList(featuresText),
+      listingImagePath: form.listingImagePath,
       images: selectedProduct?.images ?? form.images,
-      downloads: selectedProduct?.downloads ?? form.downloads,
+      downloads: form.variants[0]?.downloads ?? [],
+      price: form.variants[0]?.price ?? 0,
+      stripePriceId: form.variants[0]?.stripePriceId ?? "",
+      pageCount: form.variants[0]?.pageCount ?? 1,
+      variants: form.variants.map((variant, index) => ({
+        ...variant,
+        id: normalizeVariantId(variant.id) || `variant-${index + 1}`,
+      })),
     };
 
     try {
       const isEdit = products.some((product) => product.slug === selectedSlug);
-      const endpoint = isEdit
-        ? `/api/admin/products/${selectedSlug}`
-        : "/api/admin/products";
+      const endpoint = isEdit ? `/api/admin/products/${selectedSlug}` : "/api/admin/products";
       const method = isEdit ? "PUT" : "POST";
 
       const response = await fetch(endpoint, {
@@ -157,9 +230,7 @@ export function AdminProductManager({
       syncProduct(saved, selectedSlug);
       setStatus("Product saved.");
     } catch (saveError) {
-      setError(
-        saveError instanceof Error ? saveError.message : "Unable to save product.",
-      );
+      setError(saveError instanceof Error ? saveError.message : "Unable to save product.");
     } finally {
       setIsPending(false);
     }
@@ -185,9 +256,7 @@ export function AdminProductManager({
         throw new Error(payload.error ?? "Unable to delete product.");
       }
 
-      const nextProducts = products.filter(
-        (product) => product.slug !== selectedProduct.slug,
-      );
+      const nextProducts = products.filter((product) => product.slug !== selectedProduct.slug);
       setProducts(nextProducts);
       if (nextProducts[0]) {
         loadProduct(nextProducts[0]);
@@ -196,24 +265,13 @@ export function AdminProductManager({
       }
       setStatus("Product deleted.");
     } catch (deleteError) {
-      setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "Unable to delete product.",
-      );
+      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete product.");
     } finally {
       setIsPending(false);
     }
   }
 
-  async function uploadAsset(
-    assetType: "image" | "download",
-    file: File,
-    metadataValue: string,
-    options?: {
-      managePendingState?: boolean;
-    },
-  ) {
+  async function uploadAsset(assetType: "image" | "download", file: File, metadataValue: string) {
     const slug = form.slug.trim();
 
     if (!slug || !selectedProduct) {
@@ -221,22 +279,22 @@ export function AdminProductManager({
       return;
     }
 
+    if (assetType === "download" && !selectedVariant) {
+      setError("Choose a variant before uploading its download zip.");
+      return;
+    }
+
     const formData = new FormData();
     formData.append("type", assetType);
     formData.append("file", file);
 
-    const managePendingState = options?.managePendingState ?? true;
-
-    if (assetType === "image" && managePendingState) {
+    if (assetType === "image") {
       formData.append("alt", metadataValue);
       setIsUploadingImage(true);
-    } else if (assetType === "image") {
-      formData.append("alt", metadataValue);
-    } else if (managePendingState) {
-      formData.append("label", metadataValue);
-      setIsUploadingDownload(true);
     } else {
       formData.append("label", metadataValue);
+      formData.append("variantId", selectedVariant.id);
+      setIsUploadingDownload(true);
     }
 
     setStatus("");
@@ -255,25 +313,17 @@ export function AdminProductManager({
       }
 
       syncProduct(payload, payload.slug);
-      setStatus(
-        assetType === "image" ? "Product image uploaded." : "Download uploaded.",
-      );
+      setStatus(assetType === "image" ? "Product image uploaded." : "Variant zip uploaded.");
       if (assetType === "image") {
         setImageAlt("");
       } else {
         setDownloadLabel("");
       }
     } catch (uploadError) {
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "Unable to upload asset.",
-      );
+      setError(uploadError instanceof Error ? uploadError.message : "Unable to upload asset.");
     } finally {
-      if (managePendingState) {
-        setIsUploadingImage(false);
-        setIsUploadingDownload(false);
-      }
+      setIsUploadingImage(false);
+      setIsUploadingDownload(false);
     }
   }
 
@@ -288,24 +338,18 @@ export function AdminProductManager({
     setStatus("");
     setError("");
 
-      try {
+    try {
       for (const file of files) {
-        await uploadAsset("image", file, imageAlt, {
-          managePendingState: false,
-        });
+        await uploadAsset("image", file, imageAlt);
       }
 
       setStatus(
-        files.length === 1
-          ? "Product image uploaded."
-          : `${files.length} product images uploaded.`,
+        files.length === 1 ? "Product image uploaded." : `${files.length} product images uploaded.`,
       );
       setImageAlt("");
     } catch (batchError) {
       setError(
-        batchError instanceof Error
-          ? batchError.message
-          : "Unable to upload product images.",
+        batchError instanceof Error ? batchError.message : "Unable to upload product images.",
       );
     } finally {
       setIsUploadingImage(false);
@@ -326,7 +370,11 @@ export function AdminProductManager({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ type, path }),
+        body: JSON.stringify({
+          type,
+          path,
+          variantId: type === "download" ? selectedVariant?.id : undefined,
+        }),
       });
 
       const payload = (await response.json()) as Product & { error?: string };
@@ -336,13 +384,9 @@ export function AdminProductManager({
       }
 
       syncProduct(payload, payload.slug);
-      setStatus(type === "image" ? "Product image removed." : "Download removed.");
+      setStatus(type === "image" ? "Product image removed." : "Variant zip removed.");
     } catch (removeError) {
-      setError(
-        removeError instanceof Error
-          ? removeError.message
-          : "Unable to delete asset.",
-      );
+      setError(removeError instanceof Error ? removeError.message : "Unable to delete asset.");
     }
   }
 
@@ -354,15 +398,9 @@ export function AdminProductManager({
             <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-coral)]">
               Catalog
             </p>
-            <h2 className="mt-2 text-2xl font-black text-[var(--brand-ink)]">
-              Products
-            </h2>
+            <h2 className="mt-2 text-2xl font-black text-[var(--brand-ink)]">Products</h2>
           </div>
-          <button
-            className="secondary-button"
-            onClick={() => resetEditor()}
-            type="button"
-          >
+          <button className="secondary-button" onClick={() => resetEditor()} type="button">
             New product
           </button>
         </div>
@@ -371,9 +409,7 @@ export function AdminProductManager({
             <button
               key={product.slug}
               className={`w-full rounded-[1.4rem] px-4 py-4 text-left ${
-                product.slug === selectedSlug
-                  ? "bg-[var(--surface-pop)]"
-                  : "bg-white/70"
+                product.slug === selectedSlug ? "bg-[var(--surface-pop)]" : "bg-white/70"
               }`}
               onClick={() => resetEditor(product)}
               type="button"
@@ -383,8 +419,8 @@ export function AdminProductManager({
                   <p className="font-black text-[var(--brand-ink)]">{product.name}</p>
                   <p className="text-sm text-slate-600">{product.slug}</p>
                 </div>
-                <span className="text-lg font-black text-[var(--brand-ink)]">
-                  ${product.price.toFixed(2)}
+                <span className="text-right text-sm font-black text-[var(--brand-ink)]">
+                  From ${Math.min(...product.variants.map((variant) => variant.price)).toFixed(2)}
                 </span>
               </div>
             </button>
@@ -427,59 +463,32 @@ export function AdminProductManager({
             />
           </label>
           <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Price
-            <input
-              className="field"
-              min="1"
-              step="0.01"
-              type="number"
-              value={form.price}
-              onChange={(event) =>
-                setForm({ ...form, price: Number(event.target.value) })
-              }
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Stripe price ID
-            <input
-              className="field"
-              placeholder="price_123"
-              value={form.stripePriceId}
-              onChange={(event) =>
-                setForm({ ...form, stripePriceId: event.target.value })
-              }
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
             Category
             <input
               className="field"
               value={form.category}
-              onChange={(event) =>
-                setForm({ ...form, category: event.target.value })
-              }
+              onChange={(event) => setForm({ ...form, category: event.target.value })}
             />
           </label>
           <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Page count
-            <input
+            Featured
+            <select
               className="field"
-              min="1"
-              type="number"
-              value={form.pageCount}
+              value={form.featured ? "yes" : "no"}
               onChange={(event) =>
-                setForm({ ...form, pageCount: Number(event.target.value) })
+                setForm({ ...form, featured: event.target.value === "yes" })
               }
-            />
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
           </label>
           <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
             Tagline
             <input
               className="field"
               value={form.tagline}
-              onChange={(event) =>
-                setForm({ ...form, tagline: event.target.value })
-              }
+              onChange={(event) => setForm({ ...form, tagline: event.target.value })}
             />
           </label>
           <div className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
@@ -509,16 +518,14 @@ export function AdminProductManager({
             <textarea
               className="field min-h-28"
               value={form.description}
-              onChange={(event) =>
-                setForm({ ...form, description: event.target.value })
-              }
+              onChange={(event) => setForm({ ...form, description: event.target.value })}
             />
           </label>
           <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
             Audience
             <input
               className="field"
-              placeholder="Kids ministry, Homeschool, Family devotions"
+              placeholder="Homeschool families, Sunday school"
               value={audienceText}
               onChange={(event) => setAudienceText(event.target.value)}
             />
@@ -527,32 +534,144 @@ export function AdminProductManager({
             Features
             <input
               className="field"
-              placeholder="Printable PDF, Scripture prompts, Bold kid-friendly lines"
+              placeholder="Printable pages, memory prompts"
               value={featuresText}
               onChange={(event) => setFeaturesText(event.target.value)}
             />
           </label>
-          <label className="flex items-center gap-3 text-sm font-bold text-slate-700 sm:col-span-2">
-            <input
-              checked={form.featured}
-              onChange={(event) =>
-                setForm({ ...form, featured: event.target.checked })
-              }
-              type="checkbox"
-            />
-            Mark as featured on the homepage
-          </label>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <button className="primary-button" disabled={isPending} onClick={saveProduct} type="button">
-            {isPending ? "Saving..." : "Save product"}
-          </button>
-          {status ? <p className="text-sm font-bold text-emerald-700">{status}</p> : null}
-          {error ? <p className="text-sm font-bold text-red-600">{error}</p> : null}
-        </div>
+        <section className="mt-6 rounded-[1.5rem] bg-white/70 px-4 py-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-black text-[var(--brand-ink)]">Variants</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Each variant has its own page count, price, Stripe price ID, and downloadable zip.
+              </p>
+            </div>
+            <button
+              className="secondary-button"
+              onClick={() => {
+                const nextVariant = createVariantDraft(form.variants.length);
+                setVariants([...form.variants, nextVariant]);
+                setSelectedVariantId(nextVariant.id);
+              }}
+              type="button"
+            >
+              Add variant
+            </button>
+          </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          <div className="mt-4 flex flex-wrap gap-2">
+            {form.variants.map((variant) => (
+              <button
+                key={variant.id}
+                className={`rounded-full px-4 py-2 text-sm font-bold ${
+                  variant.id === selectedVariantId
+                    ? "bg-[var(--brand-ink)] text-white"
+                    : "bg-[var(--surface-pop)] text-[var(--brand-ink)]"
+                }`}
+                onClick={() => setSelectedVariantId(variant.id)}
+                type="button"
+              >
+                {variant.name}
+              </button>
+            ))}
+          </div>
+
+          {selectedVariant ? (
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <label className="grid gap-2 text-sm font-bold text-slate-700">
+                Variant name
+                <input
+                  className="field"
+                  value={selectedVariant.name}
+                  onChange={(event) =>
+                    updateVariant(selectedVariant.id, (variant) => ({
+                      ...variant,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-bold text-slate-700">
+                Variant ID
+                <input
+                  className="field"
+                  value={selectedVariant.id}
+                  onChange={(event) =>
+                    updateVariant(selectedVariant.id, (variant) => ({
+                      ...variant,
+                      id: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-bold text-slate-700">
+                Price
+                <input
+                  className="field"
+                  min="0"
+                  step="0.01"
+                  type="number"
+                  value={selectedVariant.price}
+                  onChange={(event) =>
+                    updateVariant(selectedVariant.id, (variant) => ({
+                      ...variant,
+                      price: Number(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-bold text-slate-700">
+                Page count
+                <input
+                  className="field"
+                  min="1"
+                  type="number"
+                  value={selectedVariant.pageCount}
+                  onChange={(event) =>
+                    updateVariant(selectedVariant.id, (variant) => ({
+                      ...variant,
+                      pageCount: Number(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
+                Stripe price ID
+                <input
+                  className="field"
+                  placeholder="price_123"
+                  value={selectedVariant.stripePriceId}
+                  onChange={(event) =>
+                    updateVariant(selectedVariant.id, (variant) => ({
+                      ...variant,
+                      stripePriceId: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <div className="sm:col-span-2">
+                <button
+                  className="secondary-button"
+                  disabled={form.variants.length === 1}
+                  onClick={() => {
+                    const nextVariants = form.variants.filter(
+                      (variant) => variant.id !== selectedVariant.id,
+                    );
+                    setVariants(nextVariants);
+                  }}
+                  type="button"
+                >
+                  Remove this variant
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </section>
+
+        <div className="mt-6 space-y-6">
           <section className="rounded-[1.5rem] bg-white/70 px-4 py-4">
             <h3 className="text-lg font-black text-[var(--brand-ink)]">Product images</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -603,6 +722,20 @@ export function AdminProductManager({
                           {image.alt || form.name}
                         </p>
                         <p className="truncate text-xs text-slate-500">{image.path}</p>
+                        <label className="mt-3 inline-flex items-center gap-2 text-xs font-bold text-slate-600">
+                          <input
+                            checked={form.listingImagePath === image.path}
+                            name="listing-image"
+                            onChange={() =>
+                              setForm((current) => ({
+                                ...current,
+                                listingImagePath: image.path,
+                              }))
+                            }
+                            type="radio"
+                          />
+                          Use as listing thumbnail
+                        </label>
                       </div>
                       <button
                         className="secondary-button"
@@ -623,9 +756,9 @@ export function AdminProductManager({
           </section>
 
           <section className="rounded-[1.5rem] bg-white/70 px-4 py-4">
-            <h3 className="text-lg font-black text-[var(--brand-ink)]">Customer downloads</h3>
+            <h3 className="text-lg font-black text-[var(--brand-ink)]">Variant download zip</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Upload one or more digital files that paying customers can download.
+              Upload the zip customers should receive for the selected variant.
             </p>
             <div className="mt-4 grid gap-3">
               <input
@@ -636,8 +769,9 @@ export function AdminProductManager({
               />
               <input
                 className="field"
-                disabled={!selectedProduct || isUploadingDownload}
+                disabled={!selectedProduct || !selectedVariant || isUploadingDownload}
                 type="file"
+                accept=".zip,application/zip,application/x-zip-compressed"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
 
@@ -650,8 +784,8 @@ export function AdminProductManager({
               />
             </div>
             <div className="mt-4 space-y-3">
-              {form.downloads.length > 0 ? (
-                form.downloads.map((download) => (
+              {selectedVariant?.downloads.length ? (
+                selectedVariant.downloads.map((download) => (
                   <div
                     key={download.path}
                     className="rounded-[1.2rem] border border-slate-200 bg-white p-3"
@@ -675,11 +809,24 @@ export function AdminProductManager({
                 ))
               ) : (
                 <p className="text-sm text-slate-500">
-                  Upload PDFs, ZIPs, or other digital files after the product is saved.
+                  Upload a zip after the product is saved. Each variant keeps its own download list.
                 </p>
               )}
             </div>
           </section>
+        </div>
+
+        {(status || error) && (
+          <div className="mt-6 space-y-2">
+            {status ? <p className="text-sm font-bold text-emerald-700">{status}</p> : null}
+            {error ? <p className="text-sm font-bold text-red-600">{error}</p> : null}
+          </div>
+        )}
+
+        <div className="mt-6">
+          <button className="primary-button" disabled={isPending} onClick={saveProduct} type="button">
+            {isPending ? "Saving..." : "Save product"}
+          </button>
         </div>
       </div>
     </section>

@@ -47,6 +47,28 @@ export function getSupabaseServiceRoleKey() {
   return value;
 }
 
+export function getSiteUrl() {
+  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+}
+
+export function getResendApiKey() {
+  const value = process.env.RESEND_API_KEY;
+
+  if (!value) {
+    throw new Error("Missing RESEND_API_KEY environment variable.");
+  }
+
+  return value;
+}
+
+export function getContactFromEmail() {
+  return process.env.CONTACT_FROM_EMAIL ?? "Color in Faith <onboarding@resend.dev>";
+}
+
+export function getReceiptFromEmail() {
+  return process.env.RECEIPT_FROM_EMAIL ?? getContactFromEmail();
+}
+
 export function getAdminEmails() {
   return (process.env.ADMIN_EMAILS ?? "")
     .split(",")

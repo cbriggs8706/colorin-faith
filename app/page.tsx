@@ -1,89 +1,96 @@
 import Link from "next/link";
 import { NewsletterForm } from "@/components/newsletter-form";
 import { ProductCard } from "@/components/product-card";
-import { getFeaturedProducts, getSiteContent } from "@/lib/store";
+import { getProducts, getSiteContent } from "@/lib/store";
 
-export default async function Home() {
-  const [featuredProducts, siteContent] = await Promise.all([
-    getFeaturedProducts(),
+function getSingleSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string | string[] }>;
+}) {
+  const [products, siteContent, resolvedSearchParams] = await Promise.all([
+    getProducts(),
     getSiteContent(),
+    searchParams,
   ]);
+  const selectedCategory = getSingleSearchParam(resolvedSearchParams.category);
+  const categories = [...new Set(products.map((product) => product.category))];
+  const visibleProducts = selectedCategory
+    ? products.filter((product) => product.category === selectedCategory)
+    : products;
+  const featuredProduct =
+    visibleProducts.find((product) => product.featured) ?? visibleProducts[0] ?? null;
+  const remainingProducts = featuredProduct
+    ? visibleProducts.filter((product) => product.slug !== featuredProduct.slug)
+    : [];
 
   return (
-    <div className="flex flex-col gap-12 py-6 sm:gap-16 sm:py-8">
-      <section className="relative overflow-hidden rounded-[2rem] px-5 py-8 sm:px-8 sm:py-12 lg:px-12">
-        <div className="card-surface absolute inset-0 rounded-[2rem]" />
-        <div className="pointer-events-none absolute -left-12 top-8 h-28 w-28 rounded-full bg-[var(--brand-sunrise)]/50 blur-2xl" />
-        <div className="pointer-events-none absolute left-1/3 top-3 h-24 w-24 rounded-full bg-[var(--brand-fuchsia)]/24 blur-2xl" />
-        <div className="pointer-events-none absolute right-0 top-0 h-36 w-36 rounded-full bg-[var(--brand-sky)]/45 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 right-8 h-28 w-28 rounded-full bg-[var(--brand-violet)]/24 blur-2xl" />
-        <div className="relative grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
-          <div className="flex flex-col gap-5">
-            <span className="pill-label w-fit text-[var(--brand-ink)]">
-              Colorful faith-based printables
-            </span>
-            <div className="space-y-4">
-              <h1 className="section-title max-w-xl text-4xl leading-none font-extrabold text-[var(--brand-ink)] sm:text-5xl lg:text-6xl">
-                Bright coloring pages that turn quiet moments into faith-filled fun.
-              </h1>
-              <p className="max-w-2xl text-base leading-7 text-slate-700 sm:text-lg">
-                Help kids connect with Bible stories, Scripture memory, and joyful
-                creativity through instant-download printable sets made for home,
-                church, and classroom use.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Link className="primary-button" href="/shop">
-                Shop Printables
-              </Link>
-              <Link className="secondary-button" href="/about">
-                Meet the Brand
-              </Link>
-            </div>
-            <div className="grid gap-3 pt-2 text-sm font-semibold text-slate-700 sm:grid-cols-3">
-              <div className="rounded-[1.4rem] bg-white/70 px-4 py-3">
-                Instant digital downloads
-              </div>
-              <div className="rounded-[1.4rem] bg-white/70 px-4 py-3">
-                Family-friendly bright artwork
-              </div>
-              <div className="rounded-[1.4rem] bg-white/70 px-4 py-3">
-                Great for homeschool and ministry
-              </div>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-            <div className="rounded-[2rem] bg-white px-5 py-5 shadow-[0_18px_45px_rgba(32,48,66,0.16)]">
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--brand-berry)]">
-                Best Seller
-              </p>
-              <h2 className="section-title mt-2 text-2xl font-extrabold">
-                {siteContent.heroHighlight.title}
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                {siteContent.heroHighlight.description}
-              </p>
-              <div className="mt-4 flex items-center justify-between rounded-[1.4rem] bg-[var(--surface-pop)] px-4 py-3">
-                <span className="text-sm font-bold text-slate-700">
-                  {siteContent.heroHighlight.pages} printable pages
-                </span>
-                <span className="text-lg font-black text-[var(--brand-ink)]">
-                  {siteContent.heroHighlight.price}
-                </span>
-              </div>
-            </div>
-            <div className="gradient-soft rounded-[2rem] border border-white/80 px-5 py-5 shadow-[0_18px_45px_rgba(32,48,66,0.14)]">
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-[var(--brand-coral)]">
-                Shop-ready experience
-              </p>
-              <ul className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
-                <li>Stripe checkout ready for one-time digital purchases</li>
-                <li>Customer downloads delivered from attached product files</li>
-                <li>Image galleries and product management handled in one admin dashboard</li>
-              </ul>
-            </div>
+    <div className="flex flex-col gap-10 py-4 sm:gap-14 sm:py-6">
+      <section id="shop" className="space-y-5">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="pill-label w-fit text-[var(--brand-berry)]">Digital shop</p>
+            <h2 className="section-title mt-3 text-3xl font-extrabold text-[var(--brand-ink)] sm:text-4xl">
+              Printable coloring pages for joyful, screen-free moments.
+            </h2>
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
+              Every product here is an instant digital download. Use these pages for
+              family devotion time, Sunday school, Christian classrooms, party tables,
+              and everyday creative encouragement.
+            </p>
           </div>
         </div>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            className={
+              selectedCategory
+                ? "secondary-button px-4 py-2 text-sm"
+                : "primary-button px-4 py-2 text-sm"
+            }
+            href="/#shop"
+          >
+            All products
+          </Link>
+          {categories.map((category) => {
+            const isActive = selectedCategory === category;
+
+            return (
+              <Link
+                key={category}
+                className={
+                  isActive
+                    ? "primary-button px-4 py-2 text-sm"
+                    : "secondary-button px-4 py-2 text-sm"
+                }
+                href={`/?category=${encodeURIComponent(category)}#shop`}
+              >
+                {category}
+              </Link>
+            );
+          })}
+        </div>
+        {featuredProduct ? (
+          <div className="space-y-5">
+            <ProductCard product={featuredProduct} variant="featured" />
+            {remainingProducts.length > 0 ? (
+              <div className="grid gap-5 md:grid-cols-2">
+                {remainingProducts.map((product) => (
+                  <ProductCard key={product.slug} product={product} />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <section className="card-surface rounded-[2rem] px-5 py-8 sm:px-8">
+            <p className="text-base font-bold text-slate-700">
+              No products match that category yet.
+            </p>
+          </section>
+        )}
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -106,25 +113,6 @@ export default async function Home() {
             </p>
           </div>
         ))}
-      </section>
-
-      <section className="space-y-5">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <p className="pill-label w-fit text-[var(--brand-berry)]">Featured shop picks</p>
-            <h2 className="section-title mt-3 text-3xl font-extrabold text-[var(--brand-ink)] sm:text-4xl">
-              Start with the printable packs families love most.
-            </h2>
-          </div>
-          <Link className="hidden font-extrabold text-[var(--brand-ink)] sm:inline-flex" href="/shop">
-            View all products
-          </Link>
-        </div>
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {featuredProducts.map((product) => (
-            <ProductCard key={product.slug} product={product} />
-          ))}
-        </div>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
