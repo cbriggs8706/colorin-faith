@@ -42,6 +42,25 @@ function getPriceForPageCount(pageCount: number, pricing: VariantPricing[]) {
   return pricing.find((entry) => entry.pageCount === pageCount)?.price ?? pageCount;
 }
 
+function moveItem<T>(items: T[], fromIndex: number, toIndex: number) {
+  if (
+    fromIndex < 0 ||
+    toIndex < 0 ||
+    fromIndex >= items.length ||
+    toIndex >= items.length ||
+    fromIndex === toIndex
+  ) {
+    return items;
+  }
+
+  const nextItems = [...items];
+  const [movedItem] = nextItems.splice(fromIndex, 1);
+
+  nextItems.splice(toIndex, 0, movedItem);
+
+  return nextItems;
+}
+
 function syncVariant(pageCount: number, current: Partial<ProductVariant>, pricing: VariantPricing[]) {
   return {
     id: getVariantId(pageCount),
@@ -169,6 +188,25 @@ export function AdminProductManager({
     );
   }
 
+  function moveGalleryImage(imagePath: string, direction: "up" | "down") {
+    setForm((current) => {
+      const currentIndex = current.images.findIndex((image) => image.path === imagePath);
+
+      if (currentIndex < 0) {
+        return current;
+      }
+
+      const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+      return {
+        ...current,
+        images: moveItem(current.images, currentIndex, nextIndex),
+      };
+    });
+    setStatus("Gallery order updated. Save the product to keep it.");
+    setError("");
+  }
+
   function loadProduct(product: Product) {
     const pricedProduct = applyPricingToProduct(product, variantPricing);
 
@@ -262,7 +300,7 @@ export function AdminProductManager({
       audience: toTextList(audienceText),
       features: toTextList(featuresText),
       listingImagePath: form.listingImagePath,
-      images: selectedProduct?.images ?? form.images,
+      images: form.images,
       downloads: variants[0]?.downloads ?? [],
       price: Math.min(...variants.map((variant) => variant.price)),
       stripePriceId: variants[0]?.stripePriceId ?? "",
@@ -698,14 +736,16 @@ export function AdminProductManager({
                       </div>
                       {variant.imagePath ? (
                         <div className="space-y-3">
-                          <Image
-                            alt={`${form.name} ${getVariantHeading(variant.pageCount)}`}
-                            className="h-36 w-full rounded-[1rem] object-cover"
-                            height={144}
-                            src={getProductImageUrl(variant.imagePath)}
-                            unoptimized
-                            width={480}
-                          />
+                          <div className="relative h-36 w-full overflow-hidden rounded-[1rem]">
+                            <Image
+                              alt={`${form.name} ${getVariantHeading(variant.pageCount)}`}
+                              className="object-cover"
+                              fill
+                              sizes="(max-width: 1024px) 100vw, 30vw"
+                              src={getProductImageUrl(variant.imagePath)}
+                              unoptimized
+                            />
+                          </div>
                           <button
                             className="text-sm font-bold text-slate-500 underline decoration-slate-300 underline-offset-4"
                             onClick={() =>
@@ -818,16 +858,21 @@ export function AdminProductManager({
                     key={image.path}
                     className="rounded-[1.2rem] border border-slate-200 bg-white p-3"
                   >
-                    <Image
-                      alt={image.alt || form.name}
-                      className="h-32 w-full rounded-[1rem] object-cover"
-                      height={128}
-                      src={getProductImageUrl(image.path)}
-                      unoptimized
-                      width={320}
-                    />
+                    <div className="relative h-32 w-full overflow-hidden rounded-[1rem]">
+                      <Image
+                        alt={image.alt || form.name}
+                        className="object-cover"
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 24vw"
+                        src={getProductImageUrl(image.path)}
+                        unoptimized
+                      />
+                    </div>
                     <div className="mt-3 flex items-start justify-between gap-3">
                       <div className="min-w-0">
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                          Position {form.images.findIndex((entry) => entry.path === image.path) + 1}
+                        </p>
                         <p className="truncate text-sm font-bold text-[var(--brand-ink)]">
                           {image.alt || form.name}
                         </p>
@@ -847,13 +892,31 @@ export function AdminProductManager({
                           Use as listing thumbnail
                         </label>
                       </div>
-                      <button
-                        className="secondary-button"
-                        onClick={() => void removeAsset("image", image.path)}
-                        type="button"
-                      >
-                        Remove
-                      </button>
+                      <div className="flex shrink-0 flex-col gap-2">
+                        <button
+                          className="secondary-button"
+                          disabled={form.images[0]?.path === image.path}
+                          onClick={() => moveGalleryImage(image.path, "up")}
+                          type="button"
+                        >
+                          Move up
+                        </button>
+                        <button
+                          className="secondary-button"
+                          disabled={form.images[form.images.length - 1]?.path === image.path}
+                          onClick={() => moveGalleryImage(image.path, "down")}
+                          type="button"
+                        >
+                          Move down
+                        </button>
+                        <button
+                          className="secondary-button"
+                          onClick={() => void removeAsset("image", image.path)}
+                          type="button"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))

@@ -5,10 +5,18 @@ import { BuyButton } from "@/components/buy-button";
 import { ProductImageGallery } from "@/components/product-image-gallery";
 import type { Product } from "@/lib/types";
 
+const INCLUDED_ITEMS = [
+  "printable blank/numbered pages for participants",
+  "color key",
+  "example colored/filled in pages",
+  "instruction sheet",
+];
+
 type GalleryImage = {
   path: string;
   src: string;
   alt: string;
+  badgeText?: string;
 };
 
 type ProductDetailClientProps = {
@@ -41,9 +49,21 @@ export function ProductDetailClient({
   const [selectedVariantId, setSelectedVariantId] = useState(product.variants[0]?.id ?? "");
   const selectedVariant =
     product.variants.find((variant) => variant.id === selectedVariantId) ?? product.variants[0];
+  const galleryImagesWithBadges = useMemo(() => {
+    const variantBadges = new Map(
+      product.variants
+        .filter((variant) => variant.imagePath)
+        .map((variant) => [variant.imagePath as string, String(variant.pageCount)]),
+    );
+
+    return galleryImages.map((image) => ({
+      ...image,
+      badgeText: variantBadges.get(image.path),
+    }));
+  }, [galleryImages, product.variants]);
   const orderedGalleryImages = useMemo(
-    () => moveVariantImageFirst(galleryImages, selectedVariant?.imagePath ?? ""),
-    [galleryImages, selectedVariant?.imagePath],
+    () => moveVariantImageFirst(galleryImagesWithBadges, selectedVariant?.imagePath ?? ""),
+    [galleryImagesWithBadges, selectedVariant?.imagePath],
   );
 
   return (
@@ -86,10 +106,6 @@ export function ProductDetailClient({
             Up to {maxPageCount} pages
           </span>
         </div>
-        <p className="mt-4 text-sm leading-6 text-slate-700">
-          Includes a printable PDF download for personal, classroom, or ministry
-          use according to your shop policies.
-        </p>
         <div className="mt-6">
           <BuyButton
             onVariantChange={setSelectedVariantId}
@@ -102,8 +118,8 @@ export function ProductDetailClient({
             What&apos;s included
           </h2>
           <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
-            {product.features.map((feature) => (
-              <li key={feature}>• {feature}</li>
+            {INCLUDED_ITEMS.map((item) => (
+              <li key={item}>• {item}</li>
             ))}
           </ul>
         </div>

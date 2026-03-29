@@ -18,7 +18,13 @@ export default async function Home({
     searchParams,
   ]);
   const selectedCategory = getSingleSearchParam(resolvedSearchParams.category);
-  const categories = [...new Set(products.map((product) => product.category))];
+  const categories = [
+    ...new Set(
+      products
+        .map((product) => product.category.trim())
+        .filter(Boolean),
+    ),
+  ];
   const visibleProducts = selectedCategory
     ? products.filter((product) => product.category === selectedCategory)
     : products;

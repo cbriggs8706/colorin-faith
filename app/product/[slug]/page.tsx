@@ -50,7 +50,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
     src: getProductImageUrl(image.path),
     alt: image.alt || product.name,
   }));
-  const minPrice = Math.min(...product.variants.map((variant) => variant.price));
+  const paidVariantPrices = product.variants
+    .map((variant) => variant.price)
+    .filter((price) => price > 0);
+  const minPrice =
+    paidVariantPrices.length > 0
+      ? Math.min(...paidVariantPrices)
+      : Math.min(...product.variants.map((variant) => variant.price));
   const maxPageCount = Math.max(...product.variants.map((variant) => variant.pageCount));
 
   return (
