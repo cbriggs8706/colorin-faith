@@ -62,7 +62,10 @@ export default async function AdminPage() {
         </div>
       </section>
 
-      <AdminProductManager initialProducts={products} />
+      <AdminProductManager
+        initialProducts={products}
+        initialVariantPricing={siteContent.variantPricing}
+      />
     </div>
   );
 }

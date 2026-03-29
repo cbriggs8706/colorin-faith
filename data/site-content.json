@@ -45,6 +45,32 @@
       "description": "Customers complete checkout and land on a secure page where they can download the files attached to their product."
     }
   ],
+  "variantPricing": [
+    {
+      "pageCount": 1,
+      "price": 1
+    },
+    {
+      "pageCount": 4,
+      "price": 4
+    },
+    {
+      "pageCount": 9,
+      "price": 9
+    },
+    {
+      "pageCount": 16,
+      "price": 16
+    },
+    {
+      "pageCount": 25,
+      "price": 25
+    },
+    {
+      "pageCount": 36,
+      "price": 36
+    }
+  ],
   "faqs": [
     {
       "question": "Are these physical products?",

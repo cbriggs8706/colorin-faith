@@ -10,6 +10,7 @@ import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import {
   getProductBySlug,
   updateProductImages,
+  updateProductVariantImagePath,
   updateProductVariantDownloads,
 } from "@/lib/store";
 import type { ProductDownload, ProductImage } from "@/lib/types";
@@ -84,7 +85,10 @@ export async function POST(request: Request, { params }: ProductAssetRouteProps)
           alt: alt.trim() || product.name,
         },
       ];
-      const updatedProduct = await updateProductImages(slug, nextImages);
+      const productWithImages = await updateProductImages(slug, nextImages);
+      const updatedProduct = variantId
+        ? await updateProductVariantImagePath(slug, variantId, path)
+        : productWithImages;
       return NextResponse.json(updatedProduct);
     }
 
@@ -102,7 +106,6 @@ export async function POST(request: Request, { params }: ProductAssetRouteProps)
     }
 
     const nextDownloads: ProductDownload[] = [
-      ...variant.downloads,
       {
         path,
         label: label.trim() || file.name,

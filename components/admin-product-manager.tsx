@@ -7,35 +7,13 @@ import {
   getDefaultProductGradient,
   getProductImageUrl,
 } from "@/lib/product-assets";
-import type { Product, ProductInput, ProductVariant } from "@/lib/types";
-
-const emptyVariant: ProductVariant = {
-  id: "standard",
-  name: "Standard",
-  price: 5,
-  stripePriceId: "",
-  pageCount: 1,
-  downloads: [],
-};
-
-const emptyForm: ProductInput = {
-  name: "",
-  slug: "",
-  description: "",
-  price: emptyVariant.price,
-  stripePriceId: emptyVariant.stripePriceId,
-  category: "",
-  pageCount: emptyVariant.pageCount,
-  tagline: "",
-  gradient: getDefaultProductGradient(),
-  audience: [],
-  features: [],
-  featured: false,
-  listingImagePath: "",
-  images: [],
-  downloads: [],
-  variants: [emptyVariant],
-};
+import {
+  STANDARD_VARIANT_PAGE_COUNTS,
+  type Product,
+  type ProductInput,
+  type ProductVariant,
+  type VariantPricing,
+} from "@/lib/types";
 
 function toTextList(value: string) {
   return value
@@ -44,52 +22,110 @@ function toTextList(value: string) {
     .filter(Boolean);
 }
 
-function normalizeVariantId(value: string) {
-  return value
+function buildProductSlug(name: string) {
+  return name
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
 
-function createVariantDraft(index: number): ProductVariant {
+function getVariantId(pageCount: number) {
+  return `${pageCount}-pages`;
+}
+
+function getVariantHeading(pageCount: number) {
+  return `${pageCount} ${pageCount === 1 ? "page" : "pages"}`;
+}
+
+function getPriceForPageCount(pageCount: number, pricing: VariantPricing[]) {
+  return pricing.find((entry) => entry.pageCount === pageCount)?.price ?? pageCount;
+}
+
+function syncVariant(pageCount: number, current: Partial<ProductVariant>, pricing: VariantPricing[]) {
   return {
-    ...emptyVariant,
-    id: `variant-${index + 1}`,
-    name: `Variant ${index + 1}`,
+    id: getVariantId(pageCount),
+    name: getVariantHeading(pageCount),
+    pageCount,
+    price: getPriceForPageCount(pageCount, pricing),
+    stripePriceId: current.stripePriceId?.trim() ?? "",
+    imagePath: current.imagePath?.trim() ?? "",
+    downloads: current.downloads ?? [],
+  } satisfies ProductVariant;
+}
+
+function syncVariants(variants: ProductVariant[] | undefined, pricing: VariantPricing[]) {
+  return STANDARD_VARIANT_PAGE_COUNTS.map((pageCount) => {
+    const variant = variants?.find((entry) => entry.pageCount === pageCount);
+    return syncVariant(pageCount, variant ?? {}, pricing);
+  });
+}
+
+function createEmptyForm(pricing: VariantPricing[]): ProductInput {
+  const variants = syncVariants([], pricing);
+
+  return {
+    name: "",
+    slug: "",
+    description: "",
+    price: Math.min(...variants.map((variant) => variant.price)),
+    stripePriceId: variants[0]?.stripePriceId ?? "",
+    category: "",
+    pageCount: variants[0]?.pageCount ?? 1,
+    tagline: "",
+    gradient: getDefaultProductGradient(),
+    audience: [],
+    features: [],
+    featured: false,
+    listingImagePath: "",
+    images: [],
+    downloads: [],
+    variants,
   };
 }
 
-function fromProduct(product: Product): ProductInput {
+function fromProduct(product: Product, pricing: VariantPricing[]): ProductInput {
+  const variants = syncVariants(product.variants, pricing);
+
   return {
-    name: product.name,
-    slug: product.slug,
-    description: product.description,
-    price: product.price,
-    stripePriceId: product.stripePriceId,
-    category: product.category,
-    pageCount: product.pageCount,
-    tagline: product.tagline,
-    gradient: product.gradient,
-    audience: product.audience,
-    features: product.features,
-    featured: product.featured,
-    listingImagePath: product.listingImagePath,
-    images: product.images,
-    downloads: product.downloads,
-    variants: product.variants,
+    ...product,
+    price: Math.min(...variants.map((variant) => variant.price)),
+    stripePriceId: variants[0]?.stripePriceId ?? "",
+    pageCount: variants[0]?.pageCount ?? 1,
+    downloads: variants[0]?.downloads ?? [],
+    variants,
   };
+}
+
+function applyPricingToProduct(product: Product, pricing: VariantPricing[]) {
+  const variants = syncVariants(product.variants, pricing);
+
+  return {
+    ...product,
+    price: Math.min(...variants.map((variant) => variant.price)),
+    stripePriceId: variants[0]?.stripePriceId ?? "",
+    pageCount: variants[0]?.pageCount ?? 1,
+    downloads: variants[0]?.downloads ?? [],
+    variants,
+  } satisfies Product;
 }
 
 export function AdminProductManager({
   initialProducts,
+  initialVariantPricing,
 }: {
   initialProducts: Product[];
+  initialVariantPricing: VariantPricing[];
 }) {
-  const [products, setProducts] = useState(initialProducts);
+  const [variantPricing, setVariantPricing] = useState(initialVariantPricing);
+  const [products, setProducts] = useState(
+    initialProducts.map((product) => applyPricingToProduct(product, initialVariantPricing)),
+  );
   const [selectedSlug, setSelectedSlug] = useState(initialProducts[0]?.slug ?? "");
   const [form, setForm] = useState<ProductInput>(
-    initialProducts[0] ? fromProduct(initialProducts[0]) : emptyForm,
+    initialProducts[0]
+      ? fromProduct(initialProducts[0], initialVariantPricing)
+      : createEmptyForm(initialVariantPricing),
   );
   const [audienceText, setAudienceText] = useState(
     initialProducts[0]?.audience.join(", ") ?? "",
@@ -97,43 +133,31 @@ export function AdminProductManager({
   const [featuresText, setFeaturesText] = useState(
     initialProducts[0]?.features.join(", ") ?? "",
   );
-  const [selectedVariantId, setSelectedVariantId] = useState(
-    initialProducts[0]?.variants[0]?.id ?? emptyVariant.id,
-  );
-  const [imageAlt, setImageAlt] = useState("");
-  const [downloadLabel, setDownloadLabel] = useState("");
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [isUploadingDownload, setIsUploadingDownload] = useState(false);
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
+  const [uploadingImageKey, setUploadingImageKey] = useState<string | null>(null);
+  const [uploadingDownloadKey, setUploadingDownloadKey] = useState<string | null>(null);
 
   const selectedProduct = useMemo(
     () => products.find((product) => product.slug === selectedSlug),
     [products, selectedSlug],
   );
-  const selectedVariant =
-    form.variants.find((variant) => variant.id === selectedVariantId) ?? form.variants[0];
+  const derivedSlug = buildProductSlug(form.name);
 
   function setVariants(nextVariants: ProductVariant[]) {
-    setForm((current) => {
-      const variants = nextVariants.length > 0 ? nextVariants : [createVariantDraft(0)];
-      const primaryVariant = variants[0];
+    const variants = syncVariants(nextVariants, variantPricing);
+    const firstVariant = variants[0];
 
-      return {
-        ...current,
-        variants,
-        price: primaryVariant.price,
-        stripePriceId: primaryVariant.stripePriceId,
-        pageCount: primaryVariant.pageCount,
-        downloads: primaryVariant.downloads,
-      };
-    });
-    setSelectedVariantId((current) => {
-      return nextVariants.some((variant) => variant.id === current)
-        ? current
-        : (nextVariants[0]?.id ?? createVariantDraft(0).id);
-    });
+    setForm((current) => ({
+      ...current,
+      variants,
+      price: Math.min(...variants.map((variant) => variant.price)),
+      stripePriceId: firstVariant?.stripePriceId ?? "",
+      pageCount: firstVariant?.pageCount ?? 1,
+      downloads: firstVariant?.downloads ?? [],
+    }));
   }
 
   function updateVariant(
@@ -141,33 +165,29 @@ export function AdminProductManager({
     updater: (variant: ProductVariant) => ProductVariant,
   ) {
     setVariants(
-      form.variants.map((variant) => {
-        return variant.id === variantId ? updater(variant) : variant;
-      }),
+      form.variants.map((variant) => (variant.id === variantId ? updater(variant) : variant)),
     );
   }
 
   function loadProduct(product: Product) {
-    setSelectedSlug(product.slug);
-    setForm(fromProduct(product));
-    setAudienceText(product.audience.join(", "));
-    setFeaturesText(product.features.join(", "));
-    setSelectedVariantId(product.variants[0]?.id ?? emptyVariant.id);
-    setImageAlt("");
-    setDownloadLabel("");
+    const pricedProduct = applyPricingToProduct(product, variantPricing);
+
+    setSelectedSlug(pricedProduct.slug);
+    setForm(fromProduct(pricedProduct, variantPricing));
+    setAudienceText(pricedProduct.audience.join(", "));
+    setFeaturesText(pricedProduct.features.join(", "));
     setStatus("");
     setError("");
   }
 
   function syncProduct(saved: Product, previousSlug = selectedSlug) {
-    setProducts((current) => {
-      const next = [...current.filter((product) => product.slug !== previousSlug), saved].sort(
-        (left, right) => left.name.localeCompare(right.name),
-      );
+    const pricedProduct = applyPricingToProduct(saved, variantPricing);
 
-      return next;
+    setProducts((current) => {
+      const next = [...current.filter((product) => product.slug !== previousSlug), pricedProduct];
+      return next.sort((left, right) => left.name.localeCompare(right.name));
     });
-    loadProduct(saved);
+    loadProduct(pricedProduct);
   }
 
   function resetEditor(product?: Product) {
@@ -177,14 +197,57 @@ export function AdminProductManager({
     }
 
     setSelectedSlug("");
-    setForm(emptyForm);
+    setForm(createEmptyForm(variantPricing));
     setAudienceText("");
     setFeaturesText("");
-    setSelectedVariantId(emptyVariant.id);
-    setImageAlt("");
-    setDownloadLabel("");
     setStatus("");
     setError("");
+  }
+
+  async function saveVariantPricing() {
+    setIsSavingPricing(true);
+    setStatus("");
+    setError("");
+
+    try {
+      const response = await fetch("/api/admin/site-content", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ variantPricing }),
+      });
+
+      const payload = (await response.json()) as { variantPricing?: VariantPricing[]; error?: string };
+
+      if (!response.ok || !payload.variantPricing) {
+        throw new Error(payload.error ?? "Unable to save variant pricing.");
+      }
+
+      const nextPricing = payload.variantPricing;
+      setVariantPricing(nextPricing);
+      setProducts((current) => current.map((product) => applyPricingToProduct(product, nextPricing)));
+      setForm((current) => {
+        const variants = syncVariants(current.variants, nextPricing);
+        const firstVariant = variants[0];
+
+        return {
+          ...current,
+          variants,
+          price: Math.min(...variants.map((variant) => variant.price)),
+          stripePriceId: firstVariant?.stripePriceId ?? "",
+          pageCount: firstVariant?.pageCount ?? 1,
+          downloads: firstVariant?.downloads ?? [],
+        };
+      });
+      setStatus("Global variant pricing saved.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Unable to save variant pricing.",
+      );
+    } finally {
+      setIsSavingPricing(false);
+    }
   }
 
   async function saveProduct() {
@@ -192,27 +255,25 @@ export function AdminProductManager({
     setStatus("");
     setError("");
 
+    const variants = syncVariants(form.variants, variantPricing);
     const payload: ProductInput = {
       ...form,
+      slug: derivedSlug,
       audience: toTextList(audienceText),
       features: toTextList(featuresText),
       listingImagePath: form.listingImagePath,
       images: selectedProduct?.images ?? form.images,
-      downloads: form.variants[0]?.downloads ?? [],
-      price: form.variants[0]?.price ?? 0,
-      stripePriceId: form.variants[0]?.stripePriceId ?? "",
-      pageCount: form.variants[0]?.pageCount ?? 1,
-      variants: form.variants.map((variant, index) => ({
-        ...variant,
-        id: normalizeVariantId(variant.id) || `variant-${index + 1}`,
-      })),
+      downloads: variants[0]?.downloads ?? [],
+      price: Math.min(...variants.map((variant) => variant.price)),
+      stripePriceId: variants[0]?.stripePriceId ?? "",
+      pageCount: variants[0]?.pageCount ?? 1,
+      variants,
     };
 
     try {
       const isEdit = products.some((product) => product.slug === selectedSlug);
       const endpoint = isEdit ? `/api/admin/products/${selectedSlug}` : "/api/admin/products";
       const method = isEdit ? "PUT" : "POST";
-
       const response = await fetch(endpoint, {
         method,
         headers: {
@@ -249,7 +310,6 @@ export function AdminProductManager({
       const response = await fetch(`/api/admin/products/${selectedProduct.slug}`, {
         method: "DELETE",
       });
-
       const payload = (await response.json()) as { error?: string };
 
       if (!response.ok) {
@@ -271,7 +331,15 @@ export function AdminProductManager({
     }
   }
 
-  async function uploadAsset(assetType: "image" | "download", file: File, metadataValue: string) {
+  async function uploadAsset({
+    type,
+    file,
+    variant,
+  }: {
+    type: "image" | "download";
+    file: File;
+    variant?: ProductVariant;
+  }) {
     const slug = form.slug.trim();
 
     if (!slug || !selectedProduct) {
@@ -279,33 +347,38 @@ export function AdminProductManager({
       return;
     }
 
-    if (assetType === "download" && !selectedVariant) {
-      setError("Choose a variant before uploading its download zip.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("type", assetType);
-    formData.append("file", file);
-
-    if (assetType === "image") {
-      formData.append("alt", metadataValue);
-      setIsUploadingImage(true);
+    if (type === "image") {
+      setUploadingImageKey(variant?.id ?? "gallery");
     } else {
-      formData.append("label", metadataValue);
-      formData.append("variantId", selectedVariant.id);
-      setIsUploadingDownload(true);
+      setUploadingDownloadKey(variant?.id ?? "download");
     }
 
     setStatus("");
     setError("");
 
     try {
+      const formData = new FormData();
+      formData.append("type", type);
+      formData.append("file", file);
+
+      if (type === "image") {
+        formData.append(
+          "alt",
+          variant ? `${form.name} ${getVariantHeading(variant.pageCount)}` : form.name || file.name,
+        );
+
+        if (variant) {
+          formData.append("variantId", variant.id);
+        }
+      } else if (variant) {
+        formData.append("label", `${getVariantHeading(variant.pageCount)} ZIP`);
+        formData.append("variantId", variant.id);
+      }
+
       const response = await fetch(`/api/admin/products/${slug}/assets`, {
         method: "POST",
         body: formData,
       });
-
       const payload = (await response.json()) as Product & { error?: string };
 
       if (!response.ok) {
@@ -313,50 +386,22 @@ export function AdminProductManager({
       }
 
       syncProduct(payload, payload.slug);
-      setStatus(assetType === "image" ? "Product image uploaded." : "Variant zip uploaded.");
-      if (assetType === "image") {
-        setImageAlt("");
-      } else {
-        setDownloadLabel("");
-      }
+      setStatus(
+        type === "image"
+          ? variant
+            ? `${getVariantHeading(variant.pageCount)} image uploaded.`
+            : "Gallery image uploaded."
+          : `${getVariantHeading(variant?.pageCount ?? 1)} zip uploaded.`,
+      );
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Unable to upload asset.");
     } finally {
-      setIsUploadingImage(false);
-      setIsUploadingDownload(false);
+      setUploadingImageKey(null);
+      setUploadingDownloadKey(null);
     }
   }
 
-  async function uploadImageBatch(fileList: FileList) {
-    const files = Array.from(fileList);
-
-    if (files.length === 0) {
-      return;
-    }
-
-    setIsUploadingImage(true);
-    setStatus("");
-    setError("");
-
-    try {
-      for (const file of files) {
-        await uploadAsset("image", file, imageAlt);
-      }
-
-      setStatus(
-        files.length === 1 ? "Product image uploaded." : `${files.length} product images uploaded.`,
-      );
-      setImageAlt("");
-    } catch (batchError) {
-      setError(
-        batchError instanceof Error ? batchError.message : "Unable to upload product images.",
-      );
-    } finally {
-      setIsUploadingImage(false);
-    }
-  }
-
-  async function removeAsset(type: "image" | "download", path: string) {
+  async function removeAsset(type: "image" | "download", path: string, variantId?: string) {
     if (!selectedProduct) {
       return;
     }
@@ -373,10 +418,9 @@ export function AdminProductManager({
         body: JSON.stringify({
           type,
           path,
-          variantId: type === "download" ? selectedVariant?.id : undefined,
+          variantId,
         }),
       });
-
       const payload = (await response.json()) as Product & { error?: string };
 
       if (!response.ok) {
@@ -384,323 +428,389 @@ export function AdminProductManager({
       }
 
       syncProduct(payload, payload.slug);
-      setStatus(type === "image" ? "Product image removed." : "Variant zip removed.");
+      setStatus(type === "image" ? "Image removed." : "Variant zip removed.");
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : "Unable to delete asset.");
     }
   }
 
   return (
-    <section className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-      <div className="card-surface rounded-[2rem] px-5 py-6">
+    <div className="space-y-6">
+      <section className="card-surface rounded-[2rem] px-5 py-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-coral)]">
-              Catalog
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-[var(--brand-ink)]">Products</h2>
-          </div>
-          <button className="secondary-button" onClick={() => resetEditor()} type="button">
-            New product
-          </button>
-        </div>
-        <div className="mt-5 space-y-3">
-          {products.map((product) => (
-            <button
-              key={product.slug}
-              className={`w-full rounded-[1.4rem] px-4 py-4 text-left ${
-                product.slug === selectedSlug ? "bg-[var(--surface-pop)]" : "bg-white/70"
-              }`}
-              onClick={() => resetEditor(product)}
-              type="button"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-black text-[var(--brand-ink)]">{product.name}</p>
-                  <p className="text-sm text-slate-600">{product.slug}</p>
-                </div>
-                <span className="text-right text-sm font-black text-[var(--brand-ink)]">
-                  From ${Math.min(...product.variants.map((variant) => variant.price)).toFixed(2)}
-                </span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="card-surface rounded-[2rem] px-5 py-6">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-berry)]">
-              Editor
+            <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-mint)]">
+              Global variant pricing
             </p>
             <h2 className="mt-2 text-2xl font-black text-[var(--brand-ink)]">
-              {selectedSlug ? "Edit product" : "Create product"}
+              Shared prices for every product
             </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              These six prices control the page-count variants shown across the whole store.
+            </p>
           </div>
-          {selectedProduct ? (
-            <button className="secondary-button" onClick={removeProduct} type="button">
-              Delete
-            </button>
-          ) : null}
+          <button
+            className="primary-button"
+            disabled={isSavingPricing}
+            onClick={saveVariantPricing}
+            type="button"
+          >
+            {isSavingPricing ? "Saving prices..." : "Save prices"}
+          </button>
         </div>
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Name
-            <input
-              className="field"
-              value={form.name}
-              onChange={(event) => setForm({ ...form, name: event.target.value })}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Slug
-            <input
-              className="field"
-              value={form.slug}
-              onChange={(event) => setForm({ ...form, slug: event.target.value })}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Category
-            <input
-              className="field"
-              value={form.category}
-              onChange={(event) => setForm({ ...form, category: event.target.value })}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700">
-            Featured
-            <select
-              className="field"
-              value={form.featured ? "yes" : "no"}
-              onChange={(event) =>
-                setForm({ ...form, featured: event.target.value === "yes" })
-              }
-            >
-              <option value="no">No</option>
-              <option value="yes">Yes</option>
-            </select>
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
-            Tagline
-            <input
-              className="field"
-              value={form.tagline}
-              onChange={(event) => setForm({ ...form, tagline: event.target.value })}
-            />
-          </label>
-          <div className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
-            Gradient
-            <div className="grid gap-3 sm:grid-cols-3">
-              {PRODUCT_GRADIENTS.map((gradient) => {
-                const isSelected = form.gradient === gradient;
-
-                return (
-                  <button
-                    key={gradient}
-                    className={`h-20 rounded-[1.25rem] border-2 ${
-                      isSelected ? "border-[var(--brand-ink)]" : "border-white/80"
-                    }`}
-                    onClick={() => setForm({ ...form, gradient })}
-                    style={{ background: gradient }}
-                    type="button"
-                  >
-                    <span className="sr-only">Choose gradient swatch</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
-            Description
-            <textarea
-              className="field min-h-28"
-              value={form.description}
-              onChange={(event) => setForm({ ...form, description: event.target.value })}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
-            Audience
-            <input
-              className="field"
-              placeholder="Homeschool families, Sunday school"
-              value={audienceText}
-              onChange={(event) => setAudienceText(event.target.value)}
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
-            Features
-            <input
-              className="field"
-              placeholder="Printable pages, memory prompts"
-              value={featuresText}
-              onChange={(event) => setFeaturesText(event.target.value)}
-            />
-          </label>
+        <div className="mt-5 grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          {variantPricing.map((entry, index) => (
+            <label key={entry.pageCount} className="grid gap-2 text-sm font-bold text-slate-700">
+              {getVariantHeading(entry.pageCount)}
+              <input
+                className="field"
+                min="0"
+                step="0.01"
+                type="number"
+                value={entry.price}
+                onChange={(event) =>
+                  setVariantPricing((current) =>
+                    current.map((item, itemIndex) =>
+                      itemIndex === index
+                        ? { ...item, price: Math.max(0, Number(event.target.value) || 0) }
+                        : item,
+                    ),
+                  )
+                }
+              />
+            </label>
+          ))}
         </div>
+      </section>
 
-        <section className="mt-6 rounded-[1.5rem] bg-white/70 px-4 py-4">
+      <section className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="card-surface rounded-[2rem] px-5 py-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h3 className="text-lg font-black text-[var(--brand-ink)]">Variants</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Each variant has its own page count, price, Stripe price ID, and downloadable zip.
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-coral)]">
+                Catalog
               </p>
+              <h2 className="mt-2 text-2xl font-black text-[var(--brand-ink)]">Products</h2>
             </div>
-            <button
-              className="secondary-button"
-              onClick={() => {
-                const nextVariant = createVariantDraft(form.variants.length);
-                setVariants([...form.variants, nextVariant]);
-                setSelectedVariantId(nextVariant.id);
-              }}
-              type="button"
-            >
-              Add variant
+            <button className="secondary-button" onClick={() => resetEditor()} type="button">
+              New product
             </button>
           </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            {form.variants.map((variant) => (
+          <div className="mt-5 space-y-3">
+            {products.map((product) => (
               <button
-                key={variant.id}
-                className={`rounded-full px-4 py-2 text-sm font-bold ${
-                  variant.id === selectedVariantId
-                    ? "bg-[var(--brand-ink)] text-white"
-                    : "bg-[var(--surface-pop)] text-[var(--brand-ink)]"
+                key={product.slug}
+                className={`w-full rounded-[1.4rem] px-4 py-4 text-left ${
+                  product.slug === selectedSlug ? "bg-[var(--surface-pop)]" : "bg-white/70"
                 }`}
-                onClick={() => setSelectedVariantId(variant.id)}
+                onClick={() => resetEditor(product)}
                 type="button"
               >
-                {variant.name}
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-black text-[var(--brand-ink)]">{product.name}</p>
+                    <p className="text-sm text-slate-600">{product.slug}</p>
+                  </div>
+                  <span className="text-right text-sm font-black text-[var(--brand-ink)]">
+                    From ${Math.min(...product.variants.map((variant) => variant.price)).toFixed(2)}
+                  </span>
+                </div>
               </button>
             ))}
           </div>
+        </div>
 
-          {selectedVariant ? (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-2 text-sm font-bold text-slate-700">
-                Variant name
-                <input
-                  className="field"
-                  value={selectedVariant.name}
-                  onChange={(event) =>
-                    updateVariant(selectedVariant.id, (variant) => ({
-                      ...variant,
-                      name: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-bold text-slate-700">
-                Variant ID
-                <input
-                  className="field"
-                  value={selectedVariant.id}
-                  onChange={(event) =>
-                    updateVariant(selectedVariant.id, (variant) => ({
-                      ...variant,
-                      id: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-bold text-slate-700">
-                Price
-                <input
-                  className="field"
-                  min="0"
-                  step="0.01"
-                  type="number"
-                  value={selectedVariant.price}
-                  onChange={(event) =>
-                    updateVariant(selectedVariant.id, (variant) => ({
-                      ...variant,
-                      price: Number(event.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-bold text-slate-700">
-                Page count
-                <input
-                  className="field"
-                  min="1"
-                  type="number"
-                  value={selectedVariant.pageCount}
-                  onChange={(event) =>
-                    updateVariant(selectedVariant.id, (variant) => ({
-                      ...variant,
-                      pageCount: Number(event.target.value),
-                    }))
-                  }
-                />
-              </label>
-              <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
-                Stripe price ID
-                <input
-                  className="field"
-                  placeholder="price_123"
-                  value={selectedVariant.stripePriceId}
-                  onChange={(event) =>
-                    updateVariant(selectedVariant.id, (variant) => ({
-                      ...variant,
-                      stripePriceId: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <div className="sm:col-span-2">
-                <button
-                  className="secondary-button"
-                  disabled={form.variants.length === 1}
-                  onClick={() => {
-                    const nextVariants = form.variants.filter(
-                      (variant) => variant.id !== selectedVariant.id,
-                    );
-                    setVariants(nextVariants);
-                  }}
-                  type="button"
-                >
-                  Remove this variant
-                </button>
+        <div className="card-surface rounded-[2rem] px-5 py-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-berry)]">
+                Editor
+              </p>
+              <h2 className="mt-2 text-2xl font-black text-[var(--brand-ink)]">
+                {selectedSlug ? "Edit product" : "Create product"}
+              </h2>
+            </div>
+            {selectedProduct ? (
+              <button className="secondary-button" onClick={removeProduct} type="button">
+                Delete
+              </button>
+            ) : null}
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Name
+              <input
+                className="field"
+                value={form.name}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                    slug: buildProductSlug(event.target.value),
+                  }))
+                }
+              />
+            </label>
+            <div className="grid gap-2 text-sm font-bold text-slate-700">
+              <span>Slug</span>
+              <div className="field bg-slate-100 text-slate-600">
+                {derivedSlug || "Will be created from the product name"}
               </div>
             </div>
-          ) : null}
-        </section>
-
-        <div className="mt-6 space-y-6">
-          <section className="rounded-[1.5rem] bg-white/70 px-4 py-4">
-            <h3 className="text-lg font-black text-[var(--brand-ink)]">Product images</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Upload one or more product images to display before purchase.
-            </p>
-            <div className="mt-4 grid gap-3">
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Category
               <input
                 className="field"
-                placeholder="Alt text for the next upload"
-                value={imageAlt}
-                onChange={(event) => setImageAlt(event.target.value)}
+                value={form.category}
+                onChange={(event) => setForm({ ...form, category: event.target.value })}
               />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-700">
+              Featured
+              <select
+                className="field"
+                value={form.featured ? "yes" : "no"}
+                onChange={(event) => setForm({ ...form, featured: event.target.value === "yes" })}
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
+              Tagline
               <input
                 className="field"
-                disabled={!selectedProduct || isUploadingImage}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(event) => {
-                  const files = event.target.files;
-
-                  if (files?.length) {
-                    void uploadImageBatch(files);
-                  }
-
-                  event.target.value = "";
-                }}
+                value={form.tagline}
+                onChange={(event) => setForm({ ...form, tagline: event.target.value })}
               />
+            </label>
+            <div className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
+              Gradient
+              <div className="grid gap-3 sm:grid-cols-3">
+                {PRODUCT_GRADIENTS.map((gradient) => {
+                  const isSelected = form.gradient === gradient;
+
+                  return (
+                    <button
+                      key={gradient}
+                      className={`h-20 rounded-[1.25rem] border-2 ${
+                        isSelected ? "border-[var(--brand-ink)]" : "border-white/80"
+                      }`}
+                      onClick={() => setForm({ ...form, gradient })}
+                      style={{ background: gradient }}
+                      type="button"
+                    >
+                      <span className="sr-only">Choose gradient swatch</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+            <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
+              Description
+              <textarea
+                className="field min-h-28"
+                value={form.description}
+                onChange={(event) => setForm({ ...form, description: event.target.value })}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
+              Audience
+              <input
+                className="field"
+                placeholder="Homeschool families, Sunday school"
+                value={audienceText}
+                onChange={(event) => setAudienceText(event.target.value)}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
+              Features
+              <input
+                className="field"
+                placeholder="Printable pages, memory prompts"
+                value={featuresText}
+                onChange={(event) => setFeaturesText(event.target.value)}
+              />
+            </label>
+          </div>
+
+          <section className="mt-6 rounded-[1.5rem] bg-white/70 px-4 py-4">
+            <h3 className="text-lg font-black text-[var(--brand-ink)]">Variants</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Every product includes the standard six page-count variants. Set each variant&apos;s
+              Stripe price ID, picture, and download zip here.
+            </p>
+
+            <div className="mt-5 grid gap-4">
+              {form.variants.map((variant) => (
+                <article
+                  key={variant.id}
+                  className="rounded-[1.3rem] border border-slate-200 bg-white p-4"
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
+                      <h4 className="text-lg font-black text-[var(--brand-ink)]">
+                        {getVariantHeading(variant.pageCount)}
+                      </h4>
+                      <p className="mt-1 text-sm font-bold text-slate-600">
+                        Global price: ${variant.price.toFixed(2)}
+                      </p>
+                    </div>
+                    <label className="grid gap-2 text-sm font-bold text-slate-700 lg:min-w-[260px]">
+                      Stripe price ID
+                      <input
+                        className="field"
+                        placeholder="price_123"
+                        value={variant.stripePriceId}
+                        onChange={(event) =>
+                          updateVariant(variant.id, (current) => ({
+                            ...current,
+                            stripePriceId: event.target.value,
+                          }))
+                        }
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr]">
+                    <div className="space-y-3 rounded-[1.1rem] bg-slate-50 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-black text-[var(--brand-ink)]">Variant picture</p>
+                        <label className="secondary-button cursor-pointer">
+                          {uploadingImageKey === variant.id ? "Uploading..." : "Add picture"}
+                          <input
+                            className="sr-only"
+                            disabled={!selectedProduct || uploadingImageKey !== null}
+                            type="file"
+                            accept="image/*"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+
+                              if (file) {
+                                void uploadAsset({ type: "image", file, variant });
+                              }
+
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {variant.imagePath ? (
+                        <div className="space-y-3">
+                          <Image
+                            alt={`${form.name} ${getVariantHeading(variant.pageCount)}`}
+                            className="h-36 w-full rounded-[1rem] object-cover"
+                            height={144}
+                            src={getProductImageUrl(variant.imagePath)}
+                            unoptimized
+                            width={480}
+                          />
+                          <button
+                            className="text-sm font-bold text-slate-500 underline decoration-slate-300 underline-offset-4"
+                            onClick={() =>
+                              updateVariant(variant.id, (current) => ({ ...current, imagePath: "" }))
+                            }
+                            type="button"
+                          >
+                            Use default gallery image
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500">
+                          Upload an image to make this variant swap the gallery when selected.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-3 rounded-[1.1rem] bg-slate-50 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-black text-[var(--brand-ink)]">Variant download zip</p>
+                        <label className="secondary-button cursor-pointer">
+                          {uploadingDownloadKey === variant.id ? "Uploading..." : "Add ZIP"}
+                          <input
+                            className="sr-only"
+                            disabled={!selectedProduct || uploadingDownloadKey !== null}
+                            type="file"
+                            accept=".zip,application/zip,application/x-zip-compressed"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+
+                              if (file) {
+                                void uploadAsset({ type: "download", file, variant });
+                              }
+
+                              event.target.value = "";
+                            }}
+                          />
+                        </label>
+                      </div>
+                      {variant.downloads.length > 0 ? (
+                        variant.downloads.map((download) => (
+                          <div
+                            key={download.path}
+                            className="rounded-[1rem] border border-slate-200 bg-white p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-bold text-[var(--brand-ink)]">
+                                  {download.label}
+                                </p>
+                                <p className="truncate text-xs text-slate-500">{download.path}</p>
+                              </div>
+                              <button
+                                className="secondary-button"
+                                onClick={() => void removeAsset("download", download.path, variant.id)}
+                                type="button"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-slate-500">
+                          Upload the zip customers should receive for this page-count option.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-6 rounded-[1.5rem] bg-white/70 px-4 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-black text-[var(--brand-ink)]">Product gallery</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Upload extra gallery images and choose which one appears on cards and listings.
+                </p>
+              </div>
+              <label className="secondary-button cursor-pointer">
+                {uploadingImageKey === "gallery" ? "Uploading..." : "Upload gallery images"}
+                <input
+                  className="sr-only"
+                  disabled={!selectedProduct || uploadingImageKey !== null}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(event) => {
+                    const files = Array.from(event.target.files ?? []);
+
+                    void (async () => {
+                      for (const file of files) {
+                        await uploadAsset({ type: "image", file });
+                      }
+                    })();
+
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+
             <div className="mt-4 space-y-3">
               {form.images.length > 0 ? (
                 form.images.map((image) => (
@@ -755,80 +865,25 @@ export function AdminProductManager({
             </div>
           </section>
 
-          <section className="rounded-[1.5rem] bg-white/70 px-4 py-4">
-            <h3 className="text-lg font-black text-[var(--brand-ink)]">Variant download zip</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Upload the zip customers should receive for the selected variant.
-            </p>
-            <div className="mt-4 grid gap-3">
-              <input
-                className="field"
-                placeholder="Download label for the next upload"
-                value={downloadLabel}
-                onChange={(event) => setDownloadLabel(event.target.value)}
-              />
-              <input
-                className="field"
-                disabled={!selectedProduct || !selectedVariant || isUploadingDownload}
-                type="file"
-                accept=".zip,application/zip,application/x-zip-compressed"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-
-                  if (file) {
-                    void uploadAsset("download", file, downloadLabel);
-                  }
-
-                  event.target.value = "";
-                }}
-              />
+          {(status || error) && (
+            <div className="mt-6 space-y-2">
+              {status ? <p className="text-sm font-bold text-emerald-700">{status}</p> : null}
+              {error ? <p className="text-sm font-bold text-red-600">{error}</p> : null}
             </div>
-            <div className="mt-4 space-y-3">
-              {selectedVariant?.downloads.length ? (
-                selectedVariant.downloads.map((download) => (
-                  <div
-                    key={download.path}
-                    className="rounded-[1.2rem] border border-slate-200 bg-white p-3"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-[var(--brand-ink)]">
-                          {download.label}
-                        </p>
-                        <p className="truncate text-xs text-slate-500">{download.path}</p>
-                      </div>
-                      <button
-                        className="secondary-button"
-                        onClick={() => void removeAsset("download", download.path)}
-                        type="button"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-slate-500">
-                  Upload a zip after the product is saved. Each variant keeps its own download list.
-                </p>
-              )}
-            </div>
-          </section>
-        </div>
+          )}
 
-        {(status || error) && (
-          <div className="mt-6 space-y-2">
-            {status ? <p className="text-sm font-bold text-emerald-700">{status}</p> : null}
-            {error ? <p className="text-sm font-bold text-red-600">{error}</p> : null}
+          <div className="mt-6">
+            <button
+              className="primary-button"
+              disabled={isPending}
+              onClick={saveProduct}
+              type="button"
+            >
+              {isPending ? "Saving..." : "Save product"}
+            </button>
           </div>
-        )}
-
-        <div className="mt-6">
-          <button className="primary-button" disabled={isPending} onClick={saveProduct} type="button">
-            {isPending ? "Saving..." : "Save product"}
-          </button>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   );
 }

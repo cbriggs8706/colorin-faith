@@ -4,14 +4,35 @@ import { useState } from "react";
 import { useCart } from "@/components/cart-provider";
 import type { Product } from "@/lib/types";
 
-export function BuyButton({ product }: { product: Product }) {
+type BuyButtonProps = {
+  product: Product;
+  selectedVariantId?: string;
+  onVariantChange?: (variantId: string) => void;
+};
+
+export function BuyButton({
+  product,
+  selectedVariantId: controlledVariantId,
+  onVariantChange,
+}: BuyButtonProps) {
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState("");
   const [addedToCart, setAddedToCart] = useState(false);
-  const [selectedVariantId, setSelectedVariantId] = useState(product.variants[0]?.id ?? "");
+  const [uncontrolledVariantId, setUncontrolledVariantId] = useState(
+    product.variants[0]?.id ?? "",
+  );
   const { addItem } = useCart();
+  const selectedVariantId = controlledVariantId ?? uncontrolledVariantId;
   const selectedVariant =
     product.variants.find((variant) => variant.id === selectedVariantId) ?? product.variants[0];
+
+  function setSelectedVariantId(variantId: string) {
+    onVariantChange?.(variantId);
+
+    if (controlledVariantId === undefined) {
+      setUncontrolledVariantId(variantId);
+    }
+  }
 
   async function handleCheckout() {
     if (!selectedVariant) {

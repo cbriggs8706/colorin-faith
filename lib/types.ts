@@ -1,3 +1,10 @@
+export const STANDARD_VARIANT_PAGE_COUNTS = [1, 4, 9, 16, 25, 36] as const;
+
+export type VariantPricing = {
+  pageCount: number;
+  price: number;
+};
+
 export type Product = {
   name: string;
   slug: string;
@@ -41,6 +48,7 @@ export type ProductVariant = {
   price: number;
   stripePriceId: string;
   pageCount: number;
+  imagePath?: string;
   downloads: ProductDownload[];
 };
 
@@ -97,6 +105,7 @@ export type SiteContent = {
     title: string;
     description: string;
   }>;
+  variantPricing: VariantPricing[];
   faqs: Array<{
     question: string;
     answer: string;

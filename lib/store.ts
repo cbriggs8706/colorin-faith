@@ -5,6 +5,7 @@ import {
 } from "@/lib/supabase/env";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { getDefaultProductGradient } from "@/lib/product-assets";
+import { STANDARD_VARIANT_PAGE_COUNTS } from "@/lib/types";
 import type {
   Product,
   ProductDownload,
@@ -16,6 +17,7 @@ import type {
   SiteContentRecord,
   Subscriber,
   SubscriberRecord,
+  VariantPricing,
 } from "@/lib/types";
 
 const dataDirectory = path.join(process.cwd(), "data");
@@ -23,6 +25,10 @@ const productsPath = path.join(dataDirectory, "products.json");
 const subscribersPath = path.join(dataDirectory, "subscribers.json");
 const siteContentPath = path.join(dataDirectory, "site-content.json");
 const siteContentKey = "homepage";
+const defaultVariantPricing = STANDARD_VARIANT_PAGE_COUNTS.map((pageCount) => ({
+  pageCount,
+  price: pageCount,
+})) satisfies VariantPricing[];
 
 function mapSupabaseProductError(action: "save" | "update" | "delete", message: string) {
   if (
@@ -72,6 +78,35 @@ function normalizeVariantId(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+function normalizeProductSlug(value: string) {
+  return normalizeVariantId(value);
+}
+
+function getVariantLabel(pageCount: number) {
+  return `${pageCount} ${pageCount === 1 ? "page" : "pages"}`;
+}
+
+function normalizeVariantPricing(variantPricing: VariantPricing[] | undefined) {
+  return STANDARD_VARIANT_PAGE_COUNTS.map((pageCount) => {
+    const configured = variantPricing?.find((entry) => Number(entry.pageCount) === pageCount);
+
+    return {
+      pageCount,
+      price: Math.max(0, Number(configured?.price ?? defaultVariantPricing.find((entry) => entry.pageCount === pageCount)?.price ?? pageCount)),
+    } satisfies VariantPricing;
+  });
+}
+
+function createVariantPricingMap(variantPricing: VariantPricing[] | undefined) {
+  return new Map(
+    normalizeVariantPricing(variantPricing).map((entry) => [entry.pageCount, entry.price] as const),
+  );
+}
+
+function getVariantPrice(pageCount: number, variantPricingMap: Map<number, number>) {
+  return variantPricingMap.get(pageCount) ?? 0;
+}
+
 function getFallbackVariantId(input: {
   id?: string;
   name?: string;
@@ -97,15 +132,20 @@ function getDefaultVariantValues(input: {
   pageCount?: number;
   price?: number;
   stripePriceId?: string;
+  imagePath?: string;
   downloads?: ProductDownload[];
+  variantPricingMap?: Map<number, number>;
 }) {
   const pageCount = Number(input.pageCount ?? 1);
   return {
     id: getFallbackVariantId({ pageCount }),
-    name: `${pageCount} pages`,
+    name: getVariantLabel(pageCount),
     pageCount,
-    price: Number(input.price ?? 0),
+    price: input.variantPricingMap
+      ? getVariantPrice(pageCount, input.variantPricingMap)
+      : Number(input.price ?? 0),
     stripePriceId: String(input.stripePriceId ?? ""),
+    imagePath: String(input.imagePath ?? "").trim(),
     downloads: normalizeDownloads(input.downloads ?? []),
   } satisfies ProductVariant;
 }
@@ -116,62 +156,73 @@ function normalizeVariants(
     pageCount?: number;
     price?: number;
     stripePriceId?: string;
+    imagePath?: string;
     downloads?: ProductDownload[];
   },
+  imagePaths: Set<string>,
+  variantPricingMap: Map<number, number>,
 ) {
-  const normalized = (variants ?? [])
-    .map((variant) => {
-      const id = getFallbackVariantId(variant);
+  const byPageCount = new Map<number, ProductVariant>();
 
-      return {
-        id,
-        name: variant.name.trim() || `${Math.max(1, Number(variant.pageCount))} pages`,
-        price: Number(variant.price),
-        stripePriceId: variant.stripePriceId.trim(),
-        pageCount: Math.max(1, Number(variant.pageCount)),
-        downloads: normalizeDownloads(variant.downloads ?? []),
-      } satisfies ProductVariant;
-    })
-    .filter((variant, index, all) => {
-      return (
-        variant.id &&
-        Number.isFinite(variant.price) &&
-        variant.price >= 0 &&
-        !all.some((candidate, candidateIndex) => {
-          return candidateIndex < index && candidate.id === variant.id;
-        })
+  for (const variant of variants ?? []) {
+    const pageCount = Math.max(1, Number(variant.pageCount));
+
+    if (byPageCount.has(pageCount)) {
+      throw new Error(
+        `Each variant needs a unique page count. "${getVariantLabel(pageCount)}" is duplicated.`,
       );
-    });
+    }
 
-  return normalized.length > 0 ? normalized : [getDefaultVariantValues(fallback)];
+    byPageCount.set(pageCount, variant);
+  }
+
+  return STANDARD_VARIANT_PAGE_COUNTS.map((pageCount) => {
+    const variant = byPageCount.get(pageCount);
+    const imagePath = variant?.imagePath?.trim() ?? "";
+    const downloads =
+      variant?.downloads ??
+      (Number(fallback.pageCount) === pageCount ? fallback.downloads ?? [] : []);
+
+    return getDefaultVariantValues({
+      pageCount,
+      stripePriceId: variant?.stripePriceId?.trim() ?? "",
+      imagePath: imagePaths.has(imagePath) ? imagePath : "",
+      downloads,
+      variantPricingMap,
+    });
+  });
 }
 
-function normalizeProduct(input: ProductInput): Product {
+function normalizeProduct(input: ProductInput, variantPricingMap: Map<number, number>): Product {
   if (!input.name.trim()) {
     throw new Error("Product name is required.");
   }
 
-  if (!input.slug.trim()) {
-    throw new Error("Product slug is required.");
+  const slug = normalizeProductSlug(input.name);
+
+  if (!slug) {
+    throw new Error("Product name must include letters or numbers.");
   }
 
   const images = normalizeImages(input.images);
+  const imagePaths = new Set(images.map((image) => image.path));
   const listingImagePath =
     images.some((image) => image.path === input.listingImagePath)
       ? input.listingImagePath.trim()
       : (images[0]?.path ?? "");
-  const variants = normalizeVariants(input.variants, input);
+  const variants = normalizeVariants(input.variants, input, imagePaths, variantPricingMap);
   const defaultVariant = variants[0];
+  const minPrice = Math.min(...variants.map((variant) => variant.price));
 
   return {
     ...input,
     name: input.name.trim(),
-    slug: input.slug.trim(),
+    slug,
     description: input.description.trim(),
     category: input.category.trim(),
     tagline: input.tagline.trim(),
     gradient: input.gradient.trim() || getDefaultProductGradient(),
-    price: defaultVariant.price,
+    price: minPrice,
     stripePriceId: defaultVariant.stripePriceId,
     pageCount: defaultVariant.pageCount,
     audience: input.audience.map((entry) => entry.trim()).filter(Boolean),
@@ -202,20 +253,24 @@ function normalizeDownloads(downloads: ProductDownload[]) {
     .filter((download) => download.path && download.label);
 }
 
-function productFromRecord(record: ProductRecord): Product {
+function productFromRecord(
+  record: ProductRecord,
+  variantPricingMap: Map<number, number>,
+): Product {
   const variants = normalizeVariants(record.variants, {
     pageCount: record.page_count,
     price: record.price,
     stripePriceId: record.stripe_price_id,
     downloads: record.downloads ?? [],
-  });
+  }, new Set((record.images ?? []).map((image) => image.path)), variantPricingMap);
   const defaultVariant = variants[0];
+  const minPrice = Math.min(...variants.map((variant) => variant.price));
 
   return {
     name: record.name,
     slug: record.slug,
     description: record.description,
-    price: defaultVariant.price,
+    price: minPrice,
     stripePriceId: defaultVariant.stripePriceId,
     category: record.category,
     pageCount: defaultVariant.pageCount,
@@ -262,7 +317,16 @@ function subscriberFromRecord(record: SubscriberRecord): Subscriber {
   };
 }
 
+function normalizeSiteContent(content: SiteContent): SiteContent {
+  return {
+    ...content,
+    variantPricing: normalizeVariantPricing(content.variantPricing),
+  };
+}
+
 export async function getProducts() {
+  const variantPricingMap = createVariantPricingMap((await getSiteContent()).variantPricing);
+
   if (hasSupabaseDatabaseEnv()) {
     try {
       const supabase = createSupabaseServiceRoleClient();
@@ -275,16 +339,16 @@ export async function getProducts() {
         throw error;
       }
 
-      return (data as ProductRecord[]).map(productFromRecord);
+      return (data as ProductRecord[]).map((record) => productFromRecord(record, variantPricingMap));
     } catch {
       const products = await readJsonFile<ProductInput[]>(productsPath);
-      return products.map(normalizeProduct);
+      return products.map((product) => normalizeProduct(product, variantPricingMap));
     }
   }
 
   const products = await readJsonFile<ProductInput[]>(productsPath);
   return products
-    .map(normalizeProduct)
+    .map((product) => normalizeProduct(product, variantPricingMap))
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
@@ -300,7 +364,8 @@ export async function getProductBySlug(slug: string) {
 }
 
 export async function createProduct(input: ProductInput) {
-  const product = normalizeProduct(input);
+  const variantPricingMap = createVariantPricingMap((await getSiteContent()).variantPricing);
+  const product = normalizeProduct(input, variantPricingMap);
 
   if (hasSupabaseDatabaseEnv()) {
     const supabase = createSupabaseServiceRoleClient();
@@ -314,7 +379,7 @@ export async function createProduct(input: ProductInput) {
       throw new Error(mapSupabaseProductError("save", error.message));
     }
 
-    return productFromRecord(data as ProductRecord);
+    return productFromRecord(data as ProductRecord, variantPricingMap);
   }
 
   const products = await getProducts();
@@ -329,7 +394,8 @@ export async function createProduct(input: ProductInput) {
 }
 
 export async function updateProduct(slug: string, input: ProductInput) {
-  const product = normalizeProduct(input);
+  const variantPricingMap = createVariantPricingMap((await getSiteContent()).variantPricing);
+  const product = normalizeProduct(input, variantPricingMap);
 
   if (hasSupabaseDatabaseEnv()) {
     const supabase = createSupabaseServiceRoleClient();
@@ -344,7 +410,7 @@ export async function updateProduct(slug: string, input: ProductInput) {
       throw new Error(mapSupabaseProductError("update", error.message));
     }
 
-    return productFromRecord(data as ProductRecord);
+    return productFromRecord(data as ProductRecord, variantPricingMap);
   }
 
   const products = await getProducts();
@@ -395,6 +461,40 @@ export async function updateProductImages(slug: string, images: ProductImage[]) 
   return updateProduct(slug, {
     ...product,
     images,
+    variants: product.variants.map((variant) => ({
+      ...variant,
+      imagePath: images.some((image) => image.path === variant.imagePath) ? variant.imagePath : "",
+    })),
+  });
+}
+
+export async function updateProductVariantImagePath(
+  slug: string,
+  variantId: string,
+  imagePath: string,
+) {
+  const product = await getProductBySlug(slug);
+
+  if (!product) {
+    throw new Error("Product not found.");
+  }
+
+  const hasVariant = product.variants.some((variant) => variant.id === variantId);
+
+  if (!hasVariant) {
+    throw new Error("Variant not found.");
+  }
+
+  return updateProduct(slug, {
+    ...product,
+    variants: product.variants.map((variant) =>
+      variant.id === variantId
+        ? {
+            ...variant,
+            imagePath,
+          }
+        : variant,
+    ),
   });
 }
 
@@ -511,11 +611,33 @@ export async function getSiteContent() {
         throw error;
       }
 
-      return (data as SiteContentRecord).value;
+      return normalizeSiteContent((data as SiteContentRecord).value);
     } catch {
-      return readJsonFile<SiteContent>(siteContentPath);
+      return normalizeSiteContent(await readJsonFile<SiteContent>(siteContentPath));
     }
   }
 
-  return readJsonFile<SiteContent>(siteContentPath);
+  return normalizeSiteContent(await readJsonFile<SiteContent>(siteContentPath));
+}
+
+export async function updateSiteContent(input: SiteContent) {
+  const siteContent = normalizeSiteContent(input);
+
+  if (hasSupabaseDatabaseEnv()) {
+    const supabase = createSupabaseServiceRoleClient();
+    const { data, error } = await supabase
+      .from("site_content")
+      .upsert({ key: siteContentKey, value: siteContent }, { onConflict: "key" })
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Unable to save site content: ${error.message}`);
+    }
+
+    return normalizeSiteContent((data as SiteContentRecord).value);
+  }
+
+  await writeJsonFile(siteContentPath, siteContent);
+  return siteContent;
 }
