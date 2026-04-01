@@ -10,11 +10,13 @@ import {
 import { hasGoogleAuthProvider } from "@/lib/customer-auth-config";
 import {
   getPurchasedItemsFromCheckoutSession,
+  type OrderRecord,
   markReceiptEmailSent,
   recordPaidOrderFromCheckoutSession,
 } from "@/lib/orders";
 import { sendReceiptEmail } from "@/lib/receipt-email";
 import { getCheckoutSession } from "@/lib/stripe";
+import type { PurchasedItem } from "@/lib/types";
 
 export const metadata = {
   title: "Order Success",
@@ -28,19 +30,67 @@ type SuccessPageProps = {
 
 export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   const { session_id: sessionId } = await searchParams;
-  const session = sessionId ? await getCheckoutSession(sessionId) : null;
-  const authSession = await auth();
+  let session = null;
+
+  if (sessionId) {
+    try {
+      session = await getCheckoutSession(sessionId);
+    } catch (error) {
+      console.error(`Unable to load Stripe checkout session "${sessionId}".`, error);
+    }
+  }
+
+  let authSession = null;
+
+  try {
+    authSession = await auth();
+  } catch (error) {
+    console.error("Unable to load auth session on success page.", error);
+  }
+
   const isPaid = session?.payment_status === "paid";
   const isCustomOrder = session?.metadata?.order_type === "custom";
   const checkoutEmail = session?.customer_details?.email ?? session?.customer_email ?? "";
-  const purchasedItems =
-    isPaid && session && !isCustomOrder ? await getPurchasedItemsFromCheckoutSession(session) : [];
+  let purchasedItems: PurchasedItem[] = [];
+
+  if (isPaid && session && !isCustomOrder) {
+    try {
+      purchasedItems = await getPurchasedItemsFromCheckoutSession(session);
+    } catch (error) {
+      console.error(`Unable to load purchased items for checkout session "${session.id}".`, error);
+    }
+  }
+
   const hasDownloads = purchasedItems.some((item) => item.downloads.length > 0);
-  const savedOrders =
-    isPaid && session && !isCustomOrder ? await recordPaidOrderFromCheckoutSession(session) : [];
-  const customOrder =
-    isPaid && session && isCustomOrder ? await recordPaidCustomOrderFromCheckoutSession(session) : null;
-  const customOrderWithUrls = customOrder ? await getCustomOrderWithUrls(customOrder.id) : null;
+  let savedOrders: OrderRecord[] = [];
+
+  if (isPaid && session && !isCustomOrder) {
+    try {
+      savedOrders = await recordPaidOrderFromCheckoutSession(session);
+    } catch (error) {
+      console.error(`Unable to record paid order for checkout session "${session.id}".`, error);
+    }
+  }
+
+  let customOrder = null;
+
+  if (isPaid && session && isCustomOrder) {
+    try {
+      customOrder = await recordPaidCustomOrderFromCheckoutSession(session);
+    } catch (error) {
+      console.error(`Unable to record paid custom order for checkout session "${session.id}".`, error);
+    }
+  }
+
+  let customOrderWithUrls = null;
+
+  if (customOrder) {
+    try {
+      customOrderWithUrls = await getCustomOrderWithUrls(customOrder.id);
+    } catch (error) {
+      console.error(`Unable to load custom order URLs for order "${customOrder.id}".`, error);
+    }
+  }
   const receiptWasAlreadySent = savedOrders.some((order) => Boolean(order.receipt_emailed_at));
   const shouldEmailReceipt =
     isPaid &&
