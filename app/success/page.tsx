@@ -161,12 +161,13 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
                 {hasGoogleAuthProvider() ? (
                   <GoogleSignInButton
                     callbackUrl={ordersCallbackUrl}
+                    className="primary-button w-full"
                     label="Continue with Google to save this order"
                   />
                 ) : null}
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Link
-                    className="primary-button text-center"
+                    className="secondary-button text-center"
                     href={`/signup?email=${encodeURIComponent(checkoutEmail)}&callbackUrl=${encodeURIComponent(
                       ordersCallbackUrl,
                     )}`}
