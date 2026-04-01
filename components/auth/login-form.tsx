@@ -41,7 +41,7 @@ export function LoginForm({ callbackUrl, allowGoogle }: Props) {
       {allowGoogle ? (
         <button
           type="button"
-          className="secondary-button w-full"
+          className="primary-button w-full"
           onClick={() => void signIn("google", { callbackUrl })}
         >
           Continue with Google
@@ -86,7 +86,7 @@ export function LoginForm({ callbackUrl, allowGoogle }: Props) {
 
         {error ? <p className="text-sm font-bold text-red-600">{error}</p> : null}
 
-        <button type="submit" className="primary-button w-full" disabled={isPending}>
+        <button type="submit" className="secondary-button w-full" disabled={isPending}>
           {isPending ? "Signing in..." : "Sign in"}
         </button>
       </form>

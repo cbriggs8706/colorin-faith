@@ -36,6 +36,10 @@ export async function PUT(request: Request) {
         ...siteContent.productPage,
         ...(body.productPage ?? {}),
       },
+      contactPage: {
+        ...siteContent.contactPage,
+        ...(body.contactPage ?? {}),
+      },
     });
 
     return NextResponse.json(updated);

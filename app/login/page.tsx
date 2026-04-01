@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { LoginForm } from "@/components/auth/login-form";
@@ -32,16 +31,6 @@ export default async function LoginPage({
         <div className="mt-6">
           <LoginForm callbackUrl={safeCallbackUrl} allowGoogle={hasGoogleAuthProvider()} />
         </div>
-
-        <p className="mt-5 text-center text-sm text-slate-600">
-          Prefer to create an account first?{" "}
-          <Link
-            href={`/signup?callbackUrl=${encodeURIComponent(safeCallbackUrl)}`}
-            className="font-bold text-[var(--brand-ink)] underline"
-          >
-            Sign up here
-          </Link>
-        </p>
       </section>
     </div>
   );

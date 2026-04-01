@@ -31,6 +31,12 @@ const quickLinks = [
     description: "Keep questions and answers separate so routine copy updates are easier to manage.",
   },
   {
+    href: "/admin/content/contact",
+    eyebrow: "Contact copy",
+    title: "Contact page profile",
+    description: "Upload a photo and write the about-me style text shown beside the contact form.",
+  },
+  {
     href: "/admin/custom-order",
     eyebrow: "Custom offer",
     title: "Custom product and fulfillment",
@@ -55,8 +61,8 @@ export default async function AdminOverviewPage() {
           Choose a focused admin route instead of one crowded page.
         </h2>
         <p className="mt-4 max-w-3xl text-base leading-7 text-slate-700">
-          Product editing, homepage messaging, product-page wording, and FAQs now each have their
-          own destination so you can move around the admin faster.
+          Product editing, homepage messaging, contact-page profile content, product-page wording,
+          and FAQs now each have their own destination so you can move around the admin faster.
         </p>
       </section>
 

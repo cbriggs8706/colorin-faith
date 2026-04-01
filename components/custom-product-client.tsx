@@ -26,7 +26,7 @@ export function CustomProductClient({ product }: { product: CustomProduct }) {
   const pagePrices = product.pagePrices;
   const [pageCount, setPageCount] = useState<number>(pagePrices[0]?.pageCount ?? 1);
   const [colorCount, setColorCount] = useState<number>(CUSTOM_PRODUCT_COLOR_COUNTS[0]);
-  const [hexWidth, setHexWidth] = useState(30);
+  const [hexWidth, setHexWidth] = useState(CUSTOM_PRODUCT_HEX_WIDTH_MAX);
   const [file, setFile] = useState<File | null>(null);
   const [acknowledgement, setAcknowledgement] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -133,7 +133,8 @@ export function CustomProductClient({ product }: { product: CustomProduct }) {
             >
               {pagePrices.map((entry) => (
                 <option key={entry.pageCount} value={entry.pageCount}>
-                  {entry.pageCount} {entry.pageCount === 1 ? "page" : "pages"}
+                  {entry.pageCount} {entry.pageCount === 1 ? "page" : "pages"} -{" "}
+                  {formatPrice(entry.unitAmount ?? null, entry.currency ?? null)}
                 </option>
               ))}
             </select>
@@ -160,7 +161,9 @@ export function CustomProductClient({ product }: { product: CustomProduct }) {
           </label>
 
           <label className="grid gap-2">
-            <span className="text-sm font-black text-[var(--brand-ink)]">Hexes wide</span>
+            <span className="text-sm font-black text-[var(--brand-ink)]">
+              Hexes wide ({CUSTOM_PRODUCT_HEX_WIDTH_MIN}-{CUSTOM_PRODUCT_HEX_WIDTH_MAX})
+            </span>
             <input
               className="rounded-[1rem] border border-slate-200 px-4 py-3"
               max={CUSTOM_PRODUCT_HEX_WIDTH_MAX}

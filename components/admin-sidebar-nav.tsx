@@ -26,6 +26,11 @@ const sections = [
     match: (pathname: string) => pathname.startsWith("/admin/content/faqs"),
   },
   {
+    href: "/admin/content/contact",
+    label: "Contact page profile",
+    match: (pathname: string) => pathname.startsWith("/admin/content/contact"),
+  },
+  {
     href: "/admin/custom-order",
     label: "Custom order",
     match: (pathname: string) => pathname.startsWith("/admin/custom-order"),

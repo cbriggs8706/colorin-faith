@@ -20,8 +20,8 @@ export default async function AdminDashboardLayout({
               Keep the shop organized.
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Split product editing, homepage copy, and product-page messaging into focused
-              screens.
+              Split product editing, homepage copy, contact messaging, and product-page messaging
+              into focused screens.
             </p>
             <p className="mt-5 text-sm font-bold text-slate-600">
               Signed in as <span className="text-[var(--brand-ink)]">{user.email}</span>

@@ -132,6 +132,13 @@ export type SiteContent = {
     newsletterHeading: string;
     newsletterSubheading: string;
   };
+  contactPage: {
+    profileEyebrow: string;
+    profileTitle: string;
+    profileDescription: string;
+    profileImagePath: string;
+    profileImageAlt: string;
+  };
   heroHighlight: {
     title: string;
     description: string;

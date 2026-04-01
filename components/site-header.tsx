@@ -18,13 +18,13 @@ export async function SiteHeader() {
           href="/"
           className="flex items-center justify-center gap-3 text-center md:justify-start md:text-left"
         >
-          <div className="hidden h-12 w-12 items-center justify-center overflow-hidden rounded-[1.2rem] bg-transparent md:flex">
+          <div className="hidden h-12 w-12 items-center justify-center bg-transparent md:flex">
             <Image
               src="/apple-touch-icon.png"
               alt="Color in Faith logo"
               width={42}
               height={42}
-              className="h-10 w-10 rounded-[0.95rem]"
+              className="h-10 w-10"
               priority
             />
           </div>

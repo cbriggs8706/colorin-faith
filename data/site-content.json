@@ -27,6 +27,13 @@
     "newsletterHeading": "Want launch specials and new printable drops?",
     "newsletterSubheading": "Invite visitors to stay in the loop while you grow your store."
   },
+  "contactPage": {
+    "profileEyebrow": "About me",
+    "profileTitle": "Hi, I'm the maker behind ColorIn Faith.",
+    "profileDescription": "Use this space to share a warm introduction, your heart behind the shop, and the kinds of questions people can reach out about.",
+    "profileImagePath": "",
+    "profileImageAlt": "Portrait of the shop owner"
+  },
   "heroHighlight": {
     "title": "Fruit of the Spirit Coloring Pack",
     "description": "A bestselling set with joyful fruit characters, simple Scripture tie-ins, and printable pages that work beautifully for home or classroom use.",

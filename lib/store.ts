@@ -63,6 +63,14 @@ const defaultSiteContent: SiteContent = {
     newsletterSubheading:
       "Invite visitors to stay in the loop while you grow your store.",
   },
+  contactPage: {
+    profileEyebrow: "About me",
+    profileTitle: "Hi, I'm the maker behind ColorIn Faith.",
+    profileDescription:
+      "Use this space to share a warm introduction, your heart behind the shop, and the kinds of questions people can reach out about.",
+    profileImagePath: "",
+    profileImageAlt: "Portrait of the shop owner",
+  },
   heroHighlight: {
     title: "Fruit of the Spirit Coloring Pack",
     description:
@@ -153,6 +161,10 @@ function mapSupabaseProductError(action: "save" | "update" | "delete", message: 
   }
 
   return `Unable to ${action} Supabase product: ${message}`;
+}
+
+function isMissingRelatedProductsColumnError(message: string) {
+  return message.includes("Could not find the 'related_products' column");
 }
 
 async function ensureDataFiles() {
@@ -430,6 +442,29 @@ function productToRecord(product: Product): ProductRecord {
   };
 }
 
+function productToLegacyRecord(product: Product) {
+  const record = productToRecord(product);
+
+  return {
+    name: record.name,
+    slug: record.slug,
+    description: record.description,
+    price: record.price,
+    stripe_price_id: record.stripe_price_id,
+    category: record.category,
+    page_count: record.page_count,
+    tagline: record.tagline,
+    gradient: record.gradient,
+    audience: record.audience,
+    features: record.features,
+    featured: record.featured,
+    listing_image_path: record.listing_image_path,
+    images: record.images,
+    downloads: record.downloads,
+    variants: record.variants,
+  };
+}
+
 function subscriberFromRecord(record: SubscriberRecord): Subscriber {
   return {
     email: record.email,
@@ -461,6 +496,10 @@ function normalizeSiteContent(content: SiteContent): SiteContent {
     productPage: {
       ...defaultSiteContent.productPage,
       ...(content?.productPage ?? {}),
+    },
+    contactPage: {
+      ...defaultSiteContent.contactPage,
+      ...(content?.contactPage ?? {}),
     },
     heroHighlight: {
       ...defaultSiteContent.heroHighlight,
@@ -531,11 +570,19 @@ export async function createProduct(input: ProductInput) {
 
   if (hasSupabaseDatabaseEnv()) {
     const supabase = createSupabaseServiceRoleClient();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("products")
       .insert(productToRecord(product))
       .select()
       .single();
+
+    if (error && isMissingRelatedProductsColumnError(error.message)) {
+      ({ data, error } = await supabase
+        .from("products")
+        .insert(productToLegacyRecord(product))
+        .select()
+        .single());
+    }
 
     if (error) {
       throw new Error(mapSupabaseProductError("save", error.message));
@@ -561,12 +608,21 @@ export async function updateProduct(slug: string, input: ProductInput) {
 
   if (hasSupabaseDatabaseEnv()) {
     const supabase = createSupabaseServiceRoleClient();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("products")
       .update(productToRecord(product))
       .eq("slug", slug)
       .select()
       .single();
+
+    if (error && isMissingRelatedProductsColumnError(error.message)) {
+      ({ data, error } = await supabase
+        .from("products")
+        .update(productToLegacyRecord(product))
+        .eq("slug", slug)
+        .select()
+        .single());
+    }
 
     if (error) {
       throw new Error(mapSupabaseProductError("update", error.message));
