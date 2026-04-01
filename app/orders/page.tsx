@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireCustomerUser } from "@/lib/customer-auth";
+import { getCustomOrdersForCustomer } from "@/lib/custom-orders";
 import { getCustomerOrdersWithDownloads } from "@/lib/orders";
 
 function formatPrice(amountTotal: number | null, currency: string | null) {
@@ -27,7 +28,10 @@ export const metadata = {
 
 export default async function OrdersPage() {
   const { user } = await requireCustomerUser({ callbackUrl: "/orders" });
-  const orders = await getCustomerOrdersWithDownloads(user.email);
+  const [orders, customOrders] = await Promise.all([
+    getCustomerOrdersWithDownloads(user.email),
+    getCustomOrdersForCustomer(user.email),
+  ]);
 
   return (
     <div className="py-10">
@@ -40,7 +44,7 @@ export default async function OrdersPage() {
           Signed in as <span className="font-bold">{user.email}</span>.
         </p>
 
-        {orders.length === 0 ? (
+        {orders.length === 0 && customOrders.length === 0 ? (
           <div className="mt-6 rounded-[1.5rem] bg-[var(--surface-pop)] px-5 py-5">
             <p className="font-bold text-[var(--brand-ink)]">No paid orders found yet.</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -95,6 +99,59 @@ export default async function OrdersPage() {
                     help.
                   </p>
                 )}
+              </article>
+            ))}
+
+            {customOrders.map(({ order, deliverables, sourceFileUrl }) => (
+              <article
+                key={order.id}
+                className="rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(32,48,66,0.08)]"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-2xl font-extrabold text-[var(--brand-ink)]">
+                      {order.product_name}
+                    </h2>
+                    <p className="text-sm font-bold uppercase tracking-[0.14em] text-slate-500">
+                      Purchased {formatDate(order.paid_at ?? order.created_at)}
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-slate-600">
+                      {order.page_count} pages • {order.color_count} colors • {order.hex_width} hexes wide
+                    </p>
+                    <p className="mt-1 text-sm font-bold capitalize text-slate-600">
+                      Status: {order.status.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  <p className="text-lg font-black text-[var(--brand-ink)]">
+                    {formatPrice(order.amount_total, order.currency)}
+                  </p>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  {sourceFileUrl ? (
+                    <a
+                      href={sourceFileUrl}
+                      className="rounded-[1.2rem] bg-[var(--surface-pop)] px-4 py-4 font-bold text-[var(--brand-ink)]"
+                    >
+                      View uploaded file
+                    </a>
+                  ) : null}
+                  {deliverables.map((deliverable) => (
+                    <a
+                      key={deliverable.path}
+                      href={deliverable.signedUrl}
+                      className="rounded-[1.2rem] bg-[var(--surface-pop)] px-4 py-4 font-bold text-[var(--brand-ink)]"
+                    >
+                      Download {deliverable.label}
+                    </a>
+                  ))}
+                </div>
+
+                {deliverables.length === 0 ? (
+                  <p className="mt-4 text-sm font-bold text-slate-600">
+                    Your finished custom files are not ready yet. We&apos;ll email you when they are available.
+                  </p>
+                ) : null}
               </article>
             ))}
           </div>

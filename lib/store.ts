@@ -29,13 +29,125 @@ const defaultVariantPricing = STANDARD_VARIANT_PAGE_COUNTS.map((pageCount) => ({
   pageCount,
   price: pageCount,
 })) satisfies VariantPricing[];
+const defaultSiteContent: SiteContent = {
+  homepage: {
+    shop: {
+      eyebrow: "Digital shop",
+      title: "Printable coloring pages for joyful, screen-free moments.",
+      description:
+        "Every product here is an instant digital download. Use these pages for family devotion time, Sunday school, classrooms, party tables, and everyday creative encouragement.",
+      emptyState: "No products match that category yet.",
+    },
+    howItWorks: {
+      eyebrow: "How it works",
+      title: "From browse to print in just a few taps.",
+    },
+    newsletter: {
+      eyebrow: "Freebie list",
+      title: "Grow your email list with a cheerful welcome freebie.",
+      description:
+        "Invite parents, grandparents, and ministry leaders to get early access, coupon drops, and new seasonal printable releases.",
+      formHeading: "Get launch emails and a printable freebie.",
+      formSubheading:
+        "Join the list for new printable releases, special offers, and cheerful faith-filled freebies.",
+    },
+  },
+  productPage: {
+    aboutPrintableEyebrow: "About this printable",
+    perfectForEyebrow: "Perfect for",
+    afterPurchaseTitle: "After purchase",
+    afterPurchaseDescription:
+      "Customers are sent through secure Stripe checkout, then returned to a download page with access to the files attached to this product.",
+    browseMoreLabel: "Browse more printables",
+    newsletterHeading: "Want launch specials and new printable drops?",
+    newsletterSubheading:
+      "Invite visitors to stay in the loop while you grow your store.",
+  },
+  heroHighlight: {
+    title: "Fruit of the Spirit Coloring Pack",
+    description:
+      "A bestselling set with joyful fruit characters, simple Scripture tie-ins, and printable pages that work beautifully for home or classroom use.",
+    pages: 12,
+    price: "$7",
+  },
+  valueProps: [
+    {
+      icon: "🖍️",
+      title: "Instantly printable",
+      description: "Customers can buy today and print right away without waiting for shipping.",
+      accent: "#FFE5B5",
+    },
+    {
+      icon: "📖",
+      title: "Faith-filled themes",
+      description:
+        "From Bible stories to Scripture memory, every collection keeps the message front and center.",
+      accent: "#CDEBFF",
+    },
+    {
+      icon: "🎉",
+      title: "Bright and playful",
+      description:
+        "Color palettes, shapes, and cheerful compositions feel energetic without becoming chaotic.",
+      accent: "#FFD6EA",
+    },
+    {
+      icon: "🏠",
+      title: "Made for real homes",
+      description:
+        "Perfect for busy bags, homeschool stations, church classes, and kitchen table creativity.",
+      accent: "#D7F8E5",
+    },
+  ],
+  steps: [
+    {
+      title: "Pick your favorite pack",
+      description:
+        "Browse bright faith-based collections organized for family use, class time, and seasonal moments.",
+    },
+    {
+      title: "Checkout with Stripe",
+      description:
+        "Send customers through a secure mobile-friendly Stripe checkout experience with promo code support.",
+    },
+    {
+      title: "Deliver and print",
+      description:
+        "Customers complete checkout and land on a secure page where they can download the files attached to their product.",
+    },
+  ],
+  variantPricing: defaultVariantPricing,
+  faqs: [
+    {
+      question: "Are these physical products?",
+      answer:
+        "No. Every item in the shop is a digital download, so you can check out and start printing right away.",
+    },
+    {
+      question: "How do customers receive their files?",
+      answer:
+        "After payment, customers are returned to a secure order-success page where the files attached to that product are available to download.",
+    },
+    {
+      question: "Can I update products without editing code?",
+      answer:
+        "Yes. Admin can update product details, images, downloads, and featured settings from the dashboard.",
+    },
+    {
+      question: "Can I collect subscriber emails?",
+      answer:
+        "Yes. Visitors can join your email list from the homepage and product pages to hear about new releases, promotions, and freebies.",
+    },
+  ],
+};
 
 function mapSupabaseProductError(action: "save" | "update" | "delete", message: string) {
   if (
     message.includes("Could not find the 'listing_image_path' column") ||
     message.includes("Could not find the 'downloads' column") ||
     message.includes("Could not find the 'images' column") ||
-    message.includes("Could not find the 'variants' column")
+    message.includes("Could not find the 'variants' column") ||
+    message.includes("Could not find the 'related_products' column")
   ) {
     return `Unable to ${action} Supabase product: your Supabase products table is missing the latest product asset columns. Run the SQL in supabase/schema.sql (or the migration in supabase/migrations) and refresh the schema cache.`;
   }
@@ -227,6 +339,13 @@ function normalizeProduct(input: ProductInput, variantPricingMap: Map<number, nu
     pageCount: defaultVariant.pageCount,
     audience: input.audience.map((entry) => entry.trim()).filter(Boolean),
     features: input.features.map((entry) => entry.trim()).filter(Boolean),
+    relatedProducts: Array.from(
+      new Set(
+        (input.relatedProducts ?? [])
+          .map((entry) => normalizeProductSlug(entry))
+          .filter((entry) => entry && entry !== slug),
+      ),
+    ),
     featured: Boolean(input.featured),
     listingImagePath,
     images,
@@ -278,6 +397,7 @@ function productFromRecord(
     gradient: record.gradient,
     audience: record.audience ?? [],
     features: record.features ?? [],
+    relatedProducts: (record.related_products ?? []).map((entry) => entry.trim()).filter(Boolean),
     featured: Boolean(record.featured),
     listingImagePath: record.listing_image_path ?? record.images?.[0]?.path ?? "",
     images: record.images ?? [],
@@ -301,6 +421,7 @@ function productToRecord(product: Product): ProductRecord {
     gradient: product.gradient,
     audience: product.audience,
     features: product.features,
+    related_products: product.relatedProducts,
     featured: product.featured,
     listing_image_path: product.listingImagePath,
     images: product.images,
@@ -318,9 +439,50 @@ function subscriberFromRecord(record: SubscriberRecord): Subscriber {
 }
 
 function normalizeSiteContent(content: SiteContent): SiteContent {
-  return {
+  const merged = {
+    ...defaultSiteContent,
     ...content,
-    variantPricing: normalizeVariantPricing(content.variantPricing),
+    homepage: {
+      ...defaultSiteContent.homepage,
+      ...(content?.homepage ?? {}),
+      shop: {
+        ...defaultSiteContent.homepage.shop,
+        ...(content?.homepage?.shop ?? {}),
+      },
+      howItWorks: {
+        ...defaultSiteContent.homepage.howItWorks,
+        ...(content?.homepage?.howItWorks ?? {}),
+      },
+      newsletter: {
+        ...defaultSiteContent.homepage.newsletter,
+        ...(content?.homepage?.newsletter ?? {}),
+      },
+    },
+    productPage: {
+      ...defaultSiteContent.productPage,
+      ...(content?.productPage ?? {}),
+    },
+    heroHighlight: {
+      ...defaultSiteContent.heroHighlight,
+      ...(content?.heroHighlight ?? {}),
+    },
+    valueProps: (content?.valueProps ?? defaultSiteContent.valueProps).map((value, index) => ({
+      ...defaultSiteContent.valueProps[index % defaultSiteContent.valueProps.length],
+      ...value,
+    })),
+    steps: (content?.steps ?? defaultSiteContent.steps).map((step, index) => ({
+      ...defaultSiteContent.steps[index % defaultSiteContent.steps.length],
+      ...step,
+    })),
+    faqs: (content?.faqs ?? defaultSiteContent.faqs).map((faq, index) => ({
+      ...defaultSiteContent.faqs[index % defaultSiteContent.faqs.length],
+      ...faq,
+    })),
+  } satisfies SiteContent;
+
+  return {
+    ...merged,
+    variantPricing: normalizeVariantPricing(content?.variantPricing),
   };
 }
 

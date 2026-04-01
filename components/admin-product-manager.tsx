@@ -95,6 +95,7 @@ function createEmptyForm(pricing: VariantPricing[]): ProductInput {
     gradient: getDefaultProductGradient(),
     audience: [],
     features: [],
+    relatedProducts: [],
     featured: false,
     listingImagePath: "",
     images: [],
@@ -151,6 +152,9 @@ export function AdminProductManager({
   );
   const [featuresText, setFeaturesText] = useState(
     initialProducts[0]?.features.join(", ") ?? "",
+  );
+  const [relatedProductSlugs, setRelatedProductSlugs] = useState<string[]>(
+    initialProducts[0]?.relatedProducts ?? [],
   );
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -214,6 +218,7 @@ export function AdminProductManager({
     setForm(fromProduct(pricedProduct, variantPricing));
     setAudienceText(pricedProduct.audience.join(", "));
     setFeaturesText(pricedProduct.features.join(", "));
+    setRelatedProductSlugs(pricedProduct.relatedProducts);
     setStatus("");
     setError("");
   }
@@ -238,6 +243,7 @@ export function AdminProductManager({
     setForm(createEmptyForm(variantPricing));
     setAudienceText("");
     setFeaturesText("");
+    setRelatedProductSlugs([]);
     setStatus("");
     setError("");
   }
@@ -299,6 +305,7 @@ export function AdminProductManager({
       slug: derivedSlug,
       audience: toTextList(audienceText),
       features: toTextList(featuresText),
+      relatedProducts: relatedProductSlugs,
       listingImagePath: form.listingImagePath,
       images: form.images,
       downloads: variants[0]?.downloads ?? [],
@@ -470,6 +477,14 @@ export function AdminProductManager({
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : "Unable to delete asset.");
     }
+  }
+
+  function toggleRelatedProduct(slug: string) {
+    setRelatedProductSlugs((current) =>
+      current.includes(slug)
+        ? current.filter((entry) => entry !== slug)
+        : [...current, slug],
+    );
   }
 
   return (
@@ -671,6 +686,39 @@ export function AdminProductManager({
                 onChange={(event) => setFeaturesText(event.target.value)}
               />
             </label>
+            <div className="grid gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
+              <span>Related products</span>
+              <div className="grid gap-3 rounded-[1.2rem] bg-white/70 p-4">
+                {products.filter((product) => product.slug !== selectedSlug).length > 0 ? (
+                  products
+                    .filter((product) => product.slug !== selectedSlug)
+                    .map((product) => (
+                      <label
+                        key={product.slug}
+                        className="flex items-start gap-3 rounded-[1rem] border border-slate-200 bg-white px-3 py-3"
+                      >
+                        <input
+                          checked={relatedProductSlugs.includes(product.slug)}
+                          onChange={() => toggleRelatedProduct(product.slug)}
+                          type="checkbox"
+                        />
+                        <span>
+                          <span className="block font-black text-[var(--brand-ink)]">
+                            {product.name}
+                          </span>
+                          <span className="block text-xs font-medium text-slate-500">
+                            {product.slug}
+                          </span>
+                        </span>
+                      </label>
+                    ))
+                ) : (
+                  <p className="text-sm font-medium text-slate-500">
+                    Add another product first, then you can link it here.
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           <section className="mt-6 rounded-[1.5rem] bg-white/70 px-4 py-4">

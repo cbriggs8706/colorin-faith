@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { sendCustomOrderAdminNotification } from "@/lib/custom-order-email";
+import {
+  getCustomOrderWithUrls,
+  markCustomOrderAdminNotified,
+  recordPaidCustomOrderFromCheckoutSession,
+} from "@/lib/custom-orders";
 import { hasGoogleAuthProvider } from "@/lib/customer-auth-config";
 import {
   getPurchasedItemsFromCheckoutSession,
@@ -25,15 +31,21 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   const session = sessionId ? await getCheckoutSession(sessionId) : null;
   const authSession = await auth();
   const isPaid = session?.payment_status === "paid";
+  const isCustomOrder = session?.metadata?.order_type === "custom";
   const checkoutEmail = session?.customer_details?.email ?? session?.customer_email ?? "";
   const purchasedItems =
-    isPaid && session ? await getPurchasedItemsFromCheckoutSession(session) : [];
+    isPaid && session && !isCustomOrder ? await getPurchasedItemsFromCheckoutSession(session) : [];
   const hasDownloads = purchasedItems.some((item) => item.downloads.length > 0);
-  const savedOrders = isPaid && session ? await recordPaidOrderFromCheckoutSession(session) : [];
+  const savedOrders =
+    isPaid && session && !isCustomOrder ? await recordPaidOrderFromCheckoutSession(session) : [];
+  const customOrder =
+    isPaid && session && isCustomOrder ? await recordPaidCustomOrderFromCheckoutSession(session) : null;
+  const customOrderWithUrls = customOrder ? await getCustomOrderWithUrls(customOrder.id) : null;
   const receiptWasAlreadySent = savedOrders.some((order) => Boolean(order.receipt_emailed_at));
   const shouldEmailReceipt =
     isPaid &&
     Boolean(session) &&
+    !isCustomOrder &&
     purchasedItems.length > 0 &&
     savedOrders.length > 0 &&
     !receiptWasAlreadySent;
@@ -46,6 +58,15 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
       receiptEmailSent = true;
     } catch (error) {
       console.error("Unable to send purchase receipt email.", error);
+    }
+  }
+
+  if (customOrderWithUrls && !customOrderWithUrls.order.admin_notified_at) {
+    try {
+      await sendCustomOrderAdminNotification(customOrderWithUrls);
+      await markCustomOrderAdminNotified(customOrderWithUrls.order.id);
+    } catch (error) {
+      console.error("Unable to send custom order admin notification.", error);
     }
   }
 
@@ -62,7 +83,9 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
           Thank you for your order.
         </h1>
         <p className="mt-4 text-base leading-7 text-slate-700">
-          {isPaid && purchasedItems.length > 0
+          {isPaid && isCustomOrder
+            ? "Your custom order and upload are confirmed. We will review the file and notify you when the finished files are ready in your account."
+            : isPaid && purchasedItems.length > 0
             ? "Your purchase is confirmed. Use the downloads below to grab your files."
             : "We could not verify this checkout session yet. If payment just completed, reload this page or contact support."}
         </p>
@@ -110,6 +133,28 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
               </div>
             )}
           </div>
+        ) : null}
+
+        {customOrderWithUrls ? (
+          <article className="mt-6 rounded-[1.5rem] bg-[var(--surface-pop)] px-5 py-5 text-left">
+            <h2 className="text-2xl font-extrabold text-[var(--brand-ink)]">
+              {customOrderWithUrls.order.product_name}
+            </h2>
+            <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-slate-500">
+              {customOrderWithUrls.order.page_count} pages • {customOrderWithUrls.order.color_count} colors • {customOrderWithUrls.order.hex_width} hexes wide
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              We received your upload and your order now appears in your account history. Finished files will show up there once they are delivered.
+            </p>
+            {customOrderWithUrls.sourceFileUrl ? (
+              <a
+                className="primary-button mt-4 inline-flex"
+                href={customOrderWithUrls.sourceFileUrl}
+              >
+                View uploaded file
+              </a>
+            ) : null}
+          </article>
         ) : null}
 
         {purchasedItems.length > 0 ? (
@@ -160,6 +205,12 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
         {savedOrders.length > 0 && signedInWithMatchingEmail ? (
           <p className="mt-6 text-sm font-bold text-slate-600">
             This purchase was added to your order history.
+          </p>
+        ) : null}
+
+        {customOrderWithUrls && signedInWithMatchingEmail ? (
+          <p className="mt-6 text-sm font-bold text-slate-600">
+            This custom order was added to your order history.
           </p>
         ) : null}
 

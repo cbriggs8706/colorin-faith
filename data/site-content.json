@@ -1,4 +1,32 @@
 {
+  "homepage": {
+    "shop": {
+      "eyebrow": "Digital shop",
+      "title": "Printable coloring pages for joyful, screen-free moments.",
+      "description": "Every product here is an instant digital download. Use these pages for family devotion time, Sunday school, classrooms, party tables, and everyday creative encouragement.",
+      "emptyState": "No products match that category yet."
+    },
+    "howItWorks": {
+      "eyebrow": "How it works",
+      "title": "From browse to print in just a few taps."
+    },
+    "newsletter": {
+      "eyebrow": "Freebie list",
+      "title": "Grow your email list with a cheerful welcome freebie.",
+      "description": "Invite parents, grandparents, and ministry leaders to get early access, coupon drops, and new seasonal printable releases.",
+      "formHeading": "Get launch emails and a printable freebie.",
+      "formSubheading": "Join the list for new printable releases, special offers, and cheerful faith-filled freebies."
+    }
+  },
+  "productPage": {
+    "aboutPrintableEyebrow": "About this printable",
+    "perfectForEyebrow": "Perfect for",
+    "afterPurchaseTitle": "After purchase",
+    "afterPurchaseDescription": "Customers are sent through secure Stripe checkout, then returned to a download page with access to the files attached to this product.",
+    "browseMoreLabel": "Browse more printables",
+    "newsletterHeading": "Want launch specials and new printable drops?",
+    "newsletterSubheading": "Invite visitors to stay in the loop while you grow your store."
+  },
   "heroHighlight": {
     "title": "Fruit of the Spirit Coloring Pack",
     "description": "A bestselling set with joyful fruit characters, simple Scripture tie-ins, and printable pages that work beautifully for home or classroom use.",

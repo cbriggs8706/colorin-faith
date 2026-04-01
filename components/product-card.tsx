@@ -31,12 +31,12 @@ export function ProductCard({
 
   return (
     <Link
-      className="group block rounded-[1.9rem] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(31,152,238,0.2)]"
+      className="group block h-full rounded-[1.9rem] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(31,152,238,0.2)]"
       href={`/product/${product.slug}`}
     >
       <article
-        className={`overflow-hidden rounded-[1.9rem] border border-white/70 bg-white shadow-[0_24px_60px_rgba(32,48,66,0.12)] transition duration-200 group-hover:-translate-y-1 group-hover:shadow-[0_28px_70px_rgba(32,48,66,0.16)] ${
-          isFeatured ? "grid gap-0 lg:grid-cols-[1.15fr_0.85fr]" : ""
+        className={`h-full overflow-hidden rounded-[1.9rem] border border-white/70 bg-white shadow-[0_24px_60px_rgba(32,48,66,0.12)] transition duration-200 group-hover:-translate-y-1 group-hover:shadow-[0_28px_70px_rgba(32,48,66,0.16)] ${
+          isFeatured ? "grid gap-0 lg:grid-cols-[1.15fr_0.85fr]" : "flex flex-col"
         }`}
       >
         <div
@@ -62,7 +62,7 @@ export function ProductCard({
           )}
         </div>
 
-        <div className={`flex flex-col ${isFeatured ? "justify-center p-6 sm:p-8" : "p-5"}`}>
+        <div className={`flex flex-1 flex-col ${isFeatured ? "justify-center p-6 sm:p-8" : "p-5"}`}>
           <div className="flex items-center justify-between gap-3">
             <span className="pill-label w-fit text-[var(--brand-coral)]">{product.category}</span>
             <span className="text-2xl font-black text-[var(--brand-ink)]">
@@ -83,13 +83,13 @@ export function ProductCard({
             </h2>
           </div>
 
-          <div className="mt-5 flex items-center justify-between gap-3 text-sm font-bold text-slate-600">
+          <div className="mt-auto flex items-center justify-between gap-3 pt-5 text-sm font-bold text-slate-600">
             <span>Up to {maxPageCount} printable pages</span>
             <span
               className="inline-flex items-center justify-center rounded-full px-4 py-3 text-sm font-extrabold text-white shadow-[0_14px_30px_rgba(31,80,181,0.24)] transition duration-200 group-hover:shadow-[0_18px_36px_rgba(80,32,164,0.28)]"
               style={{ background: "var(--gradient-ribbon)" }}
             >
-              View printable
+              View
             </span>
           </div>
         </div>

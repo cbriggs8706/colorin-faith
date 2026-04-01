@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/auth";
 import { getSiteContent, updateSiteContent } from "@/lib/store";
-import type { VariantPricing } from "@/lib/types";
+import type { SiteContent } from "@/lib/types";
 
 export async function PUT(request: Request) {
   const user = await getAdminUser();
@@ -11,11 +11,31 @@ export async function PUT(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { variantPricing?: VariantPricing[] };
+    const body = (await request.json()) as Partial<SiteContent>;
     const siteContent = await getSiteContent();
     const updated = await updateSiteContent({
       ...siteContent,
-      variantPricing: body.variantPricing ?? siteContent.variantPricing,
+      ...body,
+      homepage: {
+        ...siteContent.homepage,
+        ...(body.homepage ?? {}),
+        shop: {
+          ...siteContent.homepage.shop,
+          ...(body.homepage?.shop ?? {}),
+        },
+        howItWorks: {
+          ...siteContent.homepage.howItWorks,
+          ...(body.homepage?.howItWorks ?? {}),
+        },
+        newsletter: {
+          ...siteContent.homepage.newsletter,
+          ...(body.homepage?.newsletter ?? {}),
+        },
+      },
+      productPage: {
+        ...siteContent.productPage,
+        ...(body.productPage ?? {}),
+      },
     });
 
     return NextResponse.json(updated);

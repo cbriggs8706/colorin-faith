@@ -4,6 +4,15 @@ import { useState } from "react";
 import { useCart } from "@/components/cart-provider";
 import type { Product } from "@/lib/types";
 
+const VARIANT_SUBHEADINGS: Record<number, string> = {
+  1: "48 colors, 46 hexes wide",
+  4: "24 colors, 46 hexes wide",
+  9: "24 colors, 40 hexes wide",
+  16: "24 colors, 35 hexes wide",
+  25: "36 colors, 30 hexes wide",
+  36: "48 colors, 25 hexes wide",
+};
+
 type BuyButtonProps = {
   product: Product;
   selectedVariantId?: string;
@@ -81,6 +90,10 @@ export function BuyButton({
     window.setTimeout(() => setAddedToCart(false), 1600);
   }
 
+  function getVariantSubheading(pageCount: number) {
+    return VARIANT_SUBHEADINGS[pageCount] ?? `${pageCount} pages`;
+  }
+
   return (
     <div className="space-y-3">
       <div className="grid gap-3">
@@ -101,7 +114,7 @@ export function BuyButton({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="font-black text-[var(--brand-ink)]">{variant.name}</p>
-                  <p className="text-sm text-slate-600">{variant.pageCount} pages</p>
+                  <p className="text-sm text-slate-600">{getVariantSubheading(variant.pageCount)}</p>
                 </div>
                 <p className="text-lg font-black text-[var(--brand-ink)]">
                   ${variant.price.toFixed(2)}
