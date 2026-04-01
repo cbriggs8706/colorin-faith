@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { AdminCustomOrderManager } from "@/components/admin-custom-order-manager";
 import { AdminCustomProductManager } from "@/components/admin-custom-product-manager";
-import { getAllCustomOrdersWithUrls } from "@/lib/custom-orders";
 import { getCustomProduct } from "@/lib/custom-product-store";
 
 export const metadata = {
@@ -9,7 +7,7 @@ export const metadata = {
 };
 
 export default async function AdminCustomOrderPage() {
-  const [product, orders] = await Promise.all([getCustomProduct(), getAllCustomOrdersWithUrls()]);
+  const product = await getCustomProduct();
 
   return (
     <div className="flex flex-col gap-8 py-2">
@@ -17,16 +15,19 @@ export default async function AdminCustomOrderPage() {
         <div>
           <p className="pill-label w-fit text-[var(--brand-berry)]">Dedicated admin</p>
           <h1 className="section-title mt-3 text-4xl font-extrabold text-[var(--brand-ink)]">
-            Custom product and fulfillment
+            Custom product settings
           </h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
+            Manage the featured custom offer and Stripe pricing here. Custom-order fulfillment now
+            lives in the orders dashboard.
+          </p>
         </div>
-        <Link className="secondary-button" href="/admin">
-          Back to main admin
+        <Link className="secondary-button" href="/admin/orders">
+          Go to orders dashboard
         </Link>
       </div>
 
       <AdminCustomProductManager initialProduct={product} />
-      <AdminCustomOrderManager initialOrders={orders} />
     </div>
   );
 }

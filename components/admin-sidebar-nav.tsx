@@ -11,6 +11,11 @@ const sections = [
     match: (pathname: string) => pathname.startsWith("/admin/products"),
   },
   {
+    href: "/admin/orders",
+    label: "Orders",
+    match: (pathname: string) => pathname.startsWith("/admin/orders"),
+  },
+  {
     href: "/admin/content/homepage",
     label: "Homepage wording",
     match: (pathname: string) => pathname.startsWith("/admin/content/homepage"),

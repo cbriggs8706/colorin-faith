@@ -28,8 +28,10 @@ function formatMoney(amount: number | null, currency: string | null) {
 
 export function AdminCustomOrderManager({
   initialOrders,
+  accountStatusByOrderId,
 }: {
   initialOrders: CustomOrderWithUrls[];
+  accountStatusByOrderId?: Record<string, { label: string; tone: string }>;
 }) {
   const [orders, setOrders] = useState(initialOrders);
   const [status, setStatus] = useState("");
@@ -177,9 +179,18 @@ export function AdminCustomOrderManager({
           >
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-berry)]">
-                  {entry.order.product_name}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-black uppercase tracking-[0.18em] text-[var(--brand-berry)]">
+                    {entry.order.product_name}
+                  </p>
+                  {accountStatusByOrderId?.[entry.order.id] ? (
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.16em] ${accountStatusByOrderId[entry.order.id].tone}`}
+                    >
+                      {accountStatusByOrderId[entry.order.id].label}
+                    </span>
+                  ) : null}
+                </div>
                 <h3 className="mt-2 text-2xl font-black text-[var(--brand-ink)]">
                   {entry.order.customer_name ?? entry.order.customer_email ?? "Pending customer details"}
                 </h3>

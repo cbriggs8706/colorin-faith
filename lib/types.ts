@@ -261,3 +261,35 @@ export type CustomOrderWithUrls = {
   sourceFileUrl: string | null;
   deliverables: Array<CustomOrderDeliverable & { signedUrl: string }>;
 };
+
+export const PRODUCT_REVIEW_STATUSES = ["pending", "approved", "rejected"] as const;
+export const PRODUCT_REVIEW_TYPES = ["standard", "custom"] as const;
+
+export type ProductReviewStatus = (typeof PRODUCT_REVIEW_STATUSES)[number];
+export type ProductReviewType = (typeof PRODUCT_REVIEW_TYPES)[number];
+
+export type ProductReviewRecord = {
+  id: string;
+  customer_email: string;
+  customer_name: string | null;
+  review_type: ProductReviewType;
+  order_id: string;
+  product_slug: string;
+  product_name: string;
+  variant_id: string | null;
+  rating: number;
+  title: string;
+  review: string;
+  photo_paths: string[];
+  status: ProductReviewStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ProductReviewWithUrls = {
+  review: ProductReviewRecord;
+  photoUrls: Array<{
+    path: string;
+    signedUrl: string;
+  }>;
+};

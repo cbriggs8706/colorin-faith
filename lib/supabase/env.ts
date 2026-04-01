@@ -62,7 +62,10 @@ export function getResendApiKey() {
 }
 
 export function getContactFromEmail() {
-  return process.env.CONTACT_FROM_EMAIL ?? "Color in Faith <onboarding@resend.dev>";
+  return (
+    process.env.CONTACT_FROM_EMAIL ??
+    "Color in Faith <noreply@colorinfaithprintables.com>"
+  );
 }
 
 export function getReceiptFromEmail() {

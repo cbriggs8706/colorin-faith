@@ -13,6 +13,12 @@ const quickLinks = [
     description: "Browse the full product list, create new products, and edit shared variant prices.",
   },
   {
+    href: "/admin/orders",
+    eyebrow: "Sales",
+    title: "Orders and accounts",
+    description: "Review all purchases, track custom-order progress, and see whether each buyer has an account.",
+  },
+  {
     href: "/admin/content/homepage",
     eyebrow: "Homepage copy",
     title: "Homepage wording",

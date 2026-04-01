@@ -1,7 +1,10 @@
 import Link from "next/link";
+import { OrderReviewForm } from "@/components/order-review-form";
 import { requireCustomerUser } from "@/lib/customer-auth";
 import { getCustomOrdersForCustomer } from "@/lib/custom-orders";
+import { createCustomOrderReviewId, createStandardOrderReviewId, getProductReviewsForCustomer } from "@/lib/product-reviews";
 import { getCustomerOrdersWithDownloads } from "@/lib/orders";
+import { hasSupabaseDatabaseEnv } from "@/lib/supabase/env";
 
 function formatPrice(amountTotal: number | null, currency: string | null) {
   if (amountTotal === null || !currency) {
@@ -28,10 +31,13 @@ export const metadata = {
 
 export default async function OrdersPage() {
   const { user } = await requireCustomerUser({ callbackUrl: "/orders" });
-  const [orders, customOrders] = await Promise.all([
+  const reviewUploadsEnabled = hasSupabaseDatabaseEnv();
+  const [orders, customOrders, reviews] = await Promise.all([
     getCustomerOrdersWithDownloads(user.email),
     getCustomOrdersForCustomer(user.email),
+    reviewUploadsEnabled ? getProductReviewsForCustomer(user.email) : Promise.resolve([]),
   ]);
+  const reviewsByOrderId = new Map(reviews.map((entry) => [entry.review.order_id, entry]));
 
   return (
     <div className="py-10">
@@ -99,6 +105,14 @@ export default async function OrdersPage() {
                     help.
                   </p>
                 )}
+
+                <OrderReviewForm
+                  initialReview={reviewsByOrderId.get(createStandardOrderReviewId(order)) ?? null}
+                  orderId={createStandardOrderReviewId(order)}
+                  productName={order.product_name}
+                  reviewType="standard"
+                  uploadsEnabled={reviewUploadsEnabled}
+                />
               </article>
             ))}
 
@@ -152,6 +166,14 @@ export default async function OrdersPage() {
                     Your finished custom files are not ready yet. We&apos;ll email you when they are available.
                   </p>
                 ) : null}
+
+                <OrderReviewForm
+                  initialReview={reviewsByOrderId.get(createCustomOrderReviewId(order)) ?? null}
+                  orderId={createCustomOrderReviewId(order)}
+                  productName={order.product_name}
+                  reviewType="custom"
+                  uploadsEnabled={reviewUploadsEnabled}
+                />
               </article>
             ))}
           </div>
