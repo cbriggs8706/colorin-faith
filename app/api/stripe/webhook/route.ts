@@ -11,7 +11,10 @@ import {
   markReceiptEmailSent,
   recordPaidOrderFromCheckoutSession,
 } from "@/lib/orders";
-import { sendReceiptEmail } from "@/lib/receipt-email";
+import {
+  sendReceiptEmail,
+  sendStandardOrderAdminNotification,
+} from "@/lib/receipt-email";
 import { constructStripeWebhookEvent } from "@/lib/stripe";
 
 export const runtime = "nodejs";
@@ -29,8 +32,23 @@ async function handleStandardCheckoutSession(session: Stripe.Checkout.Session) {
     purchasedItems.length > 0 &&
     !receiptWasAlreadySent
   ) {
-    await sendReceiptEmail({ session, purchasedItems });
-    await markReceiptEmailSent(session.id);
+    try {
+      await sendReceiptEmail({ session, purchasedItems });
+      await markReceiptEmailSent(session.id);
+    } catch (error) {
+      console.error(`Unable to send receipt email for checkout session "${session.id}".`, error);
+    }
+  }
+
+  if (session.payment_status === "paid" && savedOrders.length > 0 && purchasedItems.length > 0) {
+    try {
+      await sendStandardOrderAdminNotification({ session, purchasedItems });
+    } catch (error) {
+      console.error(
+        `Unable to send admin notification for checkout session "${session.id}".`,
+        error,
+      );
+    }
   }
 }
 

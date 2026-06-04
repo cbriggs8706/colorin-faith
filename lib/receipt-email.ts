@@ -1,6 +1,8 @@
 import type Stripe from "stripe";
 import type { PurchasedItem } from "@/lib/types";
 import {
+  getAdminEmails,
+  getContactFromEmail,
   getReceiptFromEmail,
   getResendApiKey,
   getSiteUrl,
@@ -23,6 +25,34 @@ function formatDate(unixTimestamp: number) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(unixTimestamp * 1000));
+}
+
+async function sendEmail(payload: {
+  from: string;
+  to: string[];
+  replyTo?: string;
+  subject: string;
+  text: string;
+}) {
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${getResendApiKey()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: payload.from,
+      to: payload.to,
+      reply_to: payload.replyTo,
+      subject: payload.subject,
+      text: payload.text,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as { message?: string };
+    throw new Error(payload.message ?? "Unable to send email.");
+  }
 }
 
 type SendReceiptEmailInput = {
@@ -56,39 +86,65 @@ export async function sendReceiptEmail({
     )
     .join("\n");
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${getResendApiKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: getReceiptFromEmail(),
-      to: [customerEmail],
-      subject: "Your Color in Faith receipt",
-      text: [
-        greeting,
-        "",
-        "Thanks for your purchase from Color in Faith.",
-        `Order date: ${formatDate(session.created)}`,
-        `Amount paid: ${formatPrice(session.amount_total ?? null, session.currency ?? null)}`,
-        `Receipt number: ${session.id}`,
-        "",
-        "Items purchased:",
-        productList,
-        "",
-        "Your downloads:",
-        downloadList,
-        "",
-        `Download page: ${downloadPageUrl}`,
-        "",
-        "If you have any trouble accessing your files, reply to this email or contact support through the site.",
-      ].join("\n"),
-    }),
+  await sendEmail({
+    from: getReceiptFromEmail(),
+    to: [customerEmail],
+    subject: "Your Color in Faith receipt",
+    text: [
+      greeting,
+      "",
+      "Thanks for your purchase from Color in Faith.",
+      `Order date: ${formatDate(session.created)}`,
+      `Amount paid: ${formatPrice(session.amount_total ?? null, session.currency ?? null)}`,
+      `Receipt number: ${session.id}`,
+      "",
+      "Items purchased:",
+      productList,
+      "",
+      "Your downloads:",
+      downloadList,
+      "",
+      `Download page: ${downloadPageUrl}`,
+      "",
+      "If you have any trouble accessing your files, reply to this email or contact support through the site.",
+    ].join("\n"),
   });
+}
 
-  if (!response.ok) {
-    const payload = (await response.json()) as { message?: string };
-    throw new Error(payload.message ?? "Unable to send receipt email.");
+export async function sendStandardOrderAdminNotification({
+  session,
+  purchasedItems,
+}: SendReceiptEmailInput) {
+  const adminEmails = getAdminEmails();
+
+  if (adminEmails.length === 0) {
+    throw new Error("Missing ADMIN_EMAILS environment variable.");
   }
+
+  const customerEmail = session.customer_details?.email ?? session.customer_email ?? "Unknown";
+  const customerName = session.customer_details?.name ?? "Unknown";
+  const itemList = purchasedItems
+    .map((item) => `- ${item.name} (${item.variantName}, ${item.pageCount} pages) x${item.quantity}`)
+    .join("\n");
+
+  await sendEmail({
+    from: getContactFromEmail(),
+    to: adminEmails,
+    replyTo: session.customer_details?.email ?? session.customer_email ?? undefined,
+    subject: `New order from ${customerName}`,
+    text: [
+      "A new paid order was placed.",
+      "",
+      `Customer: ${customerName}`,
+      `Email: ${customerEmail}`,
+      `Order date: ${formatDate(session.created)}`,
+      `Amount paid: ${formatPrice(session.amount_total ?? null, session.currency ?? null)}`,
+      `Stripe session: ${session.id}`,
+      "",
+      "Items purchased:",
+      itemList,
+      "",
+      `${getSiteUrl()}/admin/orders`,
+    ].join("\n"),
+  });
 }
