@@ -92,6 +92,10 @@ export function getReceiptFromEmail() {
   return process.env.RECEIPT_FROM_EMAIL ?? getContactFromEmail();
 }
 
+export function getReplyToEmail() {
+  return process.env.REPLY_TO_EMAIL ?? getContactFromEmail();
+}
+
 export function getAdminEmails() {
   return (process.env.ADMIN_EMAILS ?? "")
     .split(",")
