@@ -89,6 +89,7 @@ export async function sendReceiptEmail({
   await sendEmail({
     from: getReceiptFromEmail(),
     to: [customerEmail],
+    replyTo: getContactFromEmail(),
     subject: "Your Color in Faith receipt",
     text: [
       greeting,
