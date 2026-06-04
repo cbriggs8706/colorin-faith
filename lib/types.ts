@@ -233,6 +233,7 @@ export type CustomOrderDeliverable = {
 export type CustomOrderRecord = {
   id: string;
   stripe_session_id: string | null;
+  customer_user_id: string | null;
   customer_email: string | null;
   customer_name: string | null;
   product_slug: string;

@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { getStripeWebhookSecret } from "@/lib/supabase/env";
 
 let stripeInstance: Stripe | null = null;
 
@@ -12,6 +13,10 @@ export function getStripe() {
   }
 
   return stripeInstance;
+}
+
+export function constructStripeWebhookEvent(payload: string, signature: string) {
+  return getStripe().webhooks.constructEvent(payload, signature, getStripeWebhookSecret());
 }
 
 export async function getCheckoutSession(sessionId: string) {

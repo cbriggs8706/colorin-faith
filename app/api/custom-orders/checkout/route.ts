@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import {
   CUSTOM_ORDER_MAX_FILE_SIZE,
   createCustomOrderStoragePath,
@@ -6,6 +7,7 @@ import {
   CUSTOM_ORDER_BUCKET,
 } from "@/lib/custom-order-assets";
 import { createCustomOrder, updateCustomOrderSourceFile } from "@/lib/custom-orders";
+import { findCustomerUserByEmail } from "@/lib/customer-auth";
 import { getCustomProduct } from "@/lib/custom-product-store";
 import { getStripe } from "@/lib/stripe";
 import { hasSupabaseDatabaseEnv, getSiteUrl } from "@/lib/supabase/env";
@@ -69,6 +71,10 @@ export async function POST(request: Request) {
     }
 
     const product = await getCustomProduct();
+    const authSession = await auth();
+    const checkoutUser = authSession?.user?.email
+      ? await findCustomerUserByEmail(authSession.user.email)
+      : null;
     const pagePrice = product.pagePrices.find((entry) => entry.pageCount === pageCount);
 
     if (!product.active) {
@@ -85,6 +91,9 @@ export async function POST(request: Request) {
     const placeholderOrder = await createCustomOrder({
       productSlug: product.slug,
       productName: product.name,
+      customerUserId: checkoutUser?.id ?? null,
+      customerEmail: checkoutUser?.email ?? null,
+      customerName: checkoutUser?.name ?? null,
       pageCount,
       colorCount,
       hexWidth,
@@ -125,9 +134,12 @@ export async function POST(request: Request) {
       ],
       allow_promotion_codes: true,
       billing_address_collection: "auto",
+      client_reference_id: checkoutUser?.id ?? undefined,
+      customer_email: checkoutUser?.email ?? undefined,
       metadata: {
         order_type: "custom",
         custom_order_id: placeholderOrder.id,
+        customer_user_id: checkoutUser?.id ?? "",
       },
     });
 

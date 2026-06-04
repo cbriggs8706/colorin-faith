@@ -1,20 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
-import { sendCustomOrderAdminNotification } from "@/lib/custom-order-email";
-import {
-  getCustomOrderWithUrls,
-  markCustomOrderAdminNotified,
-  recordPaidCustomOrderFromCheckoutSession,
-} from "@/lib/custom-orders";
+import { getCustomOrderWithUrls } from "@/lib/custom-orders";
 import { hasGoogleAuthProvider } from "@/lib/customer-auth-config";
-import {
-  getPurchasedItemsFromCheckoutSession,
-  type OrderRecord,
-  markReceiptEmailSent,
-  recordPaidOrderFromCheckoutSession,
-} from "@/lib/orders";
-import { sendReceiptEmail } from "@/lib/receipt-email";
+import { getPurchasedItemsFromCheckoutSession } from "@/lib/orders";
 import { getCheckoutSession } from "@/lib/stripe";
 import type { PurchasedItem } from "@/lib/types";
 
@@ -62,61 +51,16 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   }
 
   const hasDownloads = purchasedItems.some((item) => item.downloads.length > 0);
-  let savedOrders: OrderRecord[] = [];
-
-  if (isPaid && session && !isCustomOrder) {
-    try {
-      savedOrders = await recordPaidOrderFromCheckoutSession(session);
-    } catch (error) {
-      console.error(`Unable to record paid order for checkout session "${session.id}".`, error);
-    }
-  }
-
-  let customOrder = null;
-
-  if (isPaid && session && isCustomOrder) {
-    try {
-      customOrder = await recordPaidCustomOrderFromCheckoutSession(session);
-    } catch (error) {
-      console.error(`Unable to record paid custom order for checkout session "${session.id}".`, error);
-    }
-  }
-
   let customOrderWithUrls = null;
 
-  if (customOrder) {
+  if (session?.metadata?.custom_order_id) {
     try {
-      customOrderWithUrls = await getCustomOrderWithUrls(customOrder.id);
+      customOrderWithUrls = await getCustomOrderWithUrls(session.metadata.custom_order_id);
     } catch (error) {
-      console.error(`Unable to load custom order URLs for order "${customOrder.id}".`, error);
-    }
-  }
-  const receiptWasAlreadySent = savedOrders.some((order) => Boolean(order.receipt_emailed_at));
-  const shouldEmailReceipt =
-    isPaid &&
-    Boolean(session) &&
-    !isCustomOrder &&
-    purchasedItems.length > 0 &&
-    savedOrders.length > 0 &&
-    !receiptWasAlreadySent;
-  let receiptEmailSent = false;
-
-  if (shouldEmailReceipt && session) {
-    try {
-      await sendReceiptEmail({ session, purchasedItems });
-      await markReceiptEmailSent(session.id);
-      receiptEmailSent = true;
-    } catch (error) {
-      console.error("Unable to send purchase receipt email.", error);
-    }
-  }
-
-  if (customOrderWithUrls && !customOrderWithUrls.order.admin_notified_at) {
-    try {
-      await sendCustomOrderAdminNotification(customOrderWithUrls);
-      await markCustomOrderAdminNotified(customOrderWithUrls.order.id);
-    } catch (error) {
-      console.error("Unable to send custom order admin notification.", error);
+      console.error(
+        `Unable to load custom order URLs for order "${session.metadata.custom_order_id}".`,
+        error,
+      );
     }
   }
 
@@ -253,21 +197,9 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
           </p>
         ) : null}
 
-        {savedOrders.length > 0 && signedInWithMatchingEmail ? (
-          <p className="mt-6 text-sm font-bold text-slate-600">
-            This purchase was added to your order history.
-          </p>
-        ) : null}
-
         {customOrderWithUrls && signedInWithMatchingEmail ? (
           <p className="mt-6 text-sm font-bold text-slate-600">
             This custom order was added to your order history.
-          </p>
-        ) : null}
-
-        {(receiptEmailSent || receiptWasAlreadySent) && checkoutEmail ? (
-          <p className="mt-4 text-sm font-bold text-slate-600">
-            A receipt and secure download link were emailed to {checkoutEmail}.
           </p>
         ) : null}
 

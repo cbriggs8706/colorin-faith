@@ -26,6 +26,7 @@ function normalizeEmail(email: string | null) {
 function mapStandardOrder(record: Partial<OrderRecord>) {
   return {
     stripe_session_id: record.stripe_session_id ?? "",
+    customer_user_id: record.customer_user_id ?? null,
     customer_email: record.customer_email ?? "",
     customer_name: record.customer_name ?? null,
     product_slug: record.product_slug ?? "",

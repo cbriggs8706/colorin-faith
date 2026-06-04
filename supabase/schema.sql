@@ -103,6 +103,7 @@ create unique index if not exists verification_tokens_identifier_token_key
 
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
+  customer_user_id uuid references public.users(id) on delete set null,
   customer_email text not null,
   customer_name text,
   stripe_session_id text not null,
@@ -123,6 +124,7 @@ create table if not exists public.orders (
 create table if not exists public.custom_orders (
   id uuid primary key default gen_random_uuid(),
   stripe_session_id text,
+  customer_user_id uuid references public.users(id) on delete set null,
   customer_email text,
   customer_name text,
   product_slug text not null,
@@ -169,6 +171,12 @@ create unique index if not exists orders_session_product_key
 
 create index if not exists orders_customer_email_idx
   on public.orders (customer_email, created_at desc);
+
+create index if not exists orders_customer_user_id_idx
+  on public.orders (customer_user_id, created_at desc);
+
+create index if not exists custom_orders_customer_user_id_idx
+  on public.custom_orders (customer_user_id, created_at desc);
 
 create unique index if not exists product_reviews_review_type_order_id_key
   on public.product_reviews (review_type, order_id);

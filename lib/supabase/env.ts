@@ -48,7 +48,17 @@ export function getSupabaseServiceRoleKey() {
 }
 
 export function getSiteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const value = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "");
+
+  if (process.env.NODE_ENV === "production") {
+    const url = new URL(value);
+
+    if (url.protocol !== "https:" || url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      throw new Error("NEXT_PUBLIC_SITE_URL must be a public https origin in production.");
+    }
+  }
+
+  return value;
 }
 
 export function getResendApiKey() {
@@ -56,6 +66,16 @@ export function getResendApiKey() {
 
   if (!value) {
     throw new Error("Missing RESEND_API_KEY environment variable.");
+  }
+
+  return value;
+}
+
+export function getStripeWebhookSecret() {
+  const value = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!value) {
+    throw new Error("Missing STRIPE_WEBHOOK_SECRET environment variable.");
   }
 
   return value;

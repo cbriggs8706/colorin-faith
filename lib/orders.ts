@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { findCustomerUserByEmail } from "@/lib/customer-auth";
 import { createSignedDownloadLinks } from "@/lib/product-assets-server";
 import { getProducts } from "@/lib/store";
 import { getCheckoutSessionLineItems } from "@/lib/stripe";
@@ -7,6 +8,7 @@ import type { PurchasedItem } from "@/lib/types";
 
 export type OrderRecord = {
   stripe_session_id: string;
+  customer_user_id: string | null;
   customer_email: string;
   customer_name: string | null;
   product_slug: string;
@@ -35,6 +37,7 @@ function normalizeEmail(email: string) {
 function mapOrderRecord(record: Partial<OrderRecord>) {
   return {
     stripe_session_id: record.stripe_session_id ?? "",
+    customer_user_id: record.customer_user_id ?? null,
     customer_email: record.customer_email ?? "",
     customer_name: record.customer_name ?? null,
     product_slug: record.product_slug ?? "",
@@ -83,6 +86,18 @@ async function upsertOrders(
     .select();
 
   return { data, error };
+}
+
+async function resolveCustomerUserId(session: Stripe.Checkout.Session, customerEmail: string) {
+  const explicitUserId =
+    session.client_reference_id?.trim() || session.metadata?.customer_user_id?.trim() || null;
+
+  if (explicitUserId) {
+    return explicitUserId;
+  }
+
+  const customerUser = await findCustomerUserByEmail(customerEmail);
+  return customerUser?.id ?? null;
 }
 
 export async function getPurchasedItemsFromCheckoutSession(
@@ -142,8 +157,11 @@ export async function recordPaidOrderFromCheckoutSession(
     return [];
   }
 
+  const customerUserId = await resolveCustomerUserId(session, customerEmail);
+
   const payload = purchasedItems.map((item) => ({
     stripe_session_id: sessionId,
+    customer_user_id: customerUserId,
     customer_email: normalizeEmail(customerEmail),
     customer_name: session.customer_details?.name ?? null,
     product_slug: item.slug,

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { findCustomerUserByEmail } from "@/lib/customer-auth";
 import { getProducts } from "@/lib/store";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { getStripe } from "@/lib/stripe";
@@ -20,6 +22,10 @@ export async function POST(request: Request) {
 
     const products = await getProducts();
     const productsBySlug = new Map(products.map((product) => [product.slug, product]));
+    const authSession = await auth();
+    const checkoutUser = authSession?.user?.email
+      ? await findCustomerUserByEmail(authSession.user.email)
+      : null;
     const lineItems = requestedItems.map((item) => {
       const product = productsBySlug.get(item.slug);
       const variant =
@@ -55,6 +61,12 @@ export async function POST(request: Request) {
       line_items: lineItems,
       allow_promotion_codes: true,
       billing_address_collection: "auto",
+      client_reference_id: checkoutUser?.id ?? undefined,
+      customer_email: checkoutUser?.email ?? undefined,
+      metadata: {
+        order_type: "standard",
+        customer_user_id: checkoutUser?.id ?? "",
+      },
     });
 
     return NextResponse.json({ url: session.url });

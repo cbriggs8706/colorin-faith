@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type Stripe from "stripe";
 import { createSignedUrl } from "@/lib/custom-order-links";
+import { findCustomerUserByEmail } from "@/lib/customer-auth";
 import { createSupabaseServiceRoleClient } from "@/lib/supabase/server";
 import { hasSupabaseDatabaseEnv } from "@/lib/supabase/env";
 import {
@@ -18,6 +19,9 @@ const customOrdersPath = path.join(dataDirectory, "custom-orders.json");
 type CreateCustomOrderInput = {
   productSlug: string;
   productName: string;
+  customerUserId?: string | null;
+  customerEmail?: string | null;
+  customerName?: string | null;
   pageCount: number;
   colorCount: number;
   hexWidth: number;
@@ -60,6 +64,7 @@ function normalizeEmail(email: string | null) {
 function mapRecord(record: CustomOrderRecord) {
   return {
     ...record,
+    customer_user_id: record.customer_user_id ?? null,
     status: normalizeStatus(record.status),
     deliverables: record.deliverables ?? [],
   } satisfies CustomOrderRecord;
@@ -98,8 +103,9 @@ export async function createCustomOrder(input: CreateCustomOrderInput) {
   const order: CustomOrderRecord = {
     id: crypto.randomUUID(),
     stripe_session_id: null,
-    customer_email: null,
-    customer_name: null,
+    customer_user_id: input.customerUserId ?? null,
+    customer_email: normalizeEmail(input.customerEmail ?? null),
+    customer_name: input.customerName ?? null,
     product_slug: input.productSlug,
     product_name: input.productName,
     page_count: input.pageCount,
@@ -303,10 +309,17 @@ export async function recordPaidCustomOrderFromCheckoutSession(session: Stripe.C
     throw new Error("Custom order was not found.");
   }
 
+  const normalizedEmail = normalizeEmail(session.customer_details?.email ?? session.customer_email ?? null);
+  const customerUserId =
+    session.client_reference_id?.trim() ||
+    session.metadata?.customer_user_id?.trim() ||
+    (normalizedEmail ? (await findCustomerUserByEmail(normalizedEmail))?.id ?? null : null);
+
   return persistUpdate({
     ...order,
     stripe_session_id: session.id,
-    customer_email: normalizeEmail(session.customer_details?.email ?? session.customer_email ?? null),
+    customer_user_id: customerUserId,
+    customer_email: normalizedEmail,
     customer_name: session.customer_details?.name ?? null,
     amount_total: session.amount_total ?? null,
     currency: session.currency ?? null,
